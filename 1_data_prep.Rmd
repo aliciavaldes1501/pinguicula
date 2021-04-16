@@ -1,0 +1,668 @@
+---
+title: "Response of Pinguicula vulgaris to geothermal heating"
+subtitle: "Data preparation"
+author : "Alicia Valdés"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: 4
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(tibble.width = Inf)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r load packages, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+```
+
+# Read data from Excel files
+
+```{r}
+ping_17 <- read_excel("data/raw/Hengill 2017.xlsx", sheet = "Pinguicula")
+ping_18 <- read_excel("data/edited/Hengill 2018_AV.xlsx", 
+                      sheet = "Pinguicula_AV")
+ping_20 <- read_excel("data/edited/Hengill 2020_AV.xlsx",
+                      sheet = "Pinguicula_AV")
+ping_17_peak <- read_excel("data/raw/Hengill 2017.xlsx", 
+                           sheet = "Peak Pinguicula")
+ping_18_peak <- read_excel("data/raw/Hengill 2018.xlsx", 
+                           sheet = "Peak Pinguicula")
+ping_20_peak <- read_excel("data/edited/Hengill 2020_AV.xlsx", 
+                           sheet = "Peak Pinguicula_AV")
+ping_17_seeds <- read_excel("data/raw/Iceland_seedscount_sowing_2017_Malin.xlsx",
+                            sheet = "Pinguicula")
+ping_17_seedpods <- read_excel("data/raw/2017_Seedpodcounts+collections.xlsx",
+                            sheet = "Pinguicula")
+ping_18_seeds <- read_excel("data/raw/2018_Seedcounts+collections.xlsx",
+                            sheet = "Pinguicula")
+```
+
+# Remove rows with all NAs
+
+```{r}
+ping_17 <- ping_17 %>% drop_na(X:Y) %>% # Removing one row with all NAs
+  filter(X!="X") # Removing one row with all NAs written as "X"
+```
+
+```{r}
+ping_18 <- ping_18 %>% drop_na(X:Y) %>% # Removing one row with all NAs
+  filter(X!="X") # Removing one row with all NAs written as "X"
+```
+
+```{r}
+ping_20 <- ping_20 %>% drop_na(X:Y) # Removing one row with all NAs
+```
+
+# Change column types
+
+```{r}
+ping_17 <- ping_17 %>% mutate(plot=as.factor(Plot),id=Indv,
+                              x=as.numeric(X),y=as.numeric(Y),
+                              peak=as.factor(ifelse(Peak=="X",1,0)),
+                              comments=Comments,
+                              date1=as.Date(Date...7,format="%d.%m.%y"),
+                              temp=as.numeric(Temp),stage1=Stage...9,
+                              date2=as.Date(Date...10,format="%d.%m.%y"),
+                              stage2=Stage...11,
+                              date3=as.Date(Date...12,format="%d.%m.%y"),
+                              stage3=Stage...13,
+                              date4=as.Date(Date...14,format="%d.%m.%y"),
+                              stage4=Stage...15,
+                              date5=as.Date(Date...16,format="%d.%m.%y"),
+                              stage5=Stage...17,
+                              date6=as.Date(Date...18,format="%d.%m.%y"),
+                              stage6=Stage...19) %>%
+  select(-(Plot:Stage...19))
+```
+
+```{r}
+ping_18 <- ping_18 %>% mutate(plot=as.factor(Plot),id=Indv,
+                              x=as.numeric(X),y=as.numeric(Y),
+                              peak=as.factor(ifelse(Peak=="-",0,1)),
+                              comments=Comments,
+                              date1=as.Date(Date...7,format="%d.%m.%y"),
+                              temp1=as.numeric(Temp...8),stage1=Stage...9,
+                              date2=as.Date(Date...10,format="%d.%m.%y"),
+                              stage2=Stage...11,
+                              date3=as.Date(Date...12,format="%d.%m.%y"),
+                              stage3=Stage...13,
+                              date4=as.Date(Date...14,format="%d.%m.%y"),
+                              stage4=Stage...15,
+                              date5=as.Date(Date...16,format="%d.%m.%y"),
+                              stage5=Stage...17,
+                              date6=as.Date(Date...18,format="%d.%m.%y"),
+                              stage6=Stage...19,
+                              date7=as.Date(Date...20,format="%d.%m.%y"),
+                              stage7=Stage...21,
+                              date8=as.Date(Date...22,format="%d.%m.%y"),
+                              stage8=Stage...23,
+                              date9=as.Date(Date...24,format="%d.%m.%y"),
+                              temp2=as.numeric(Temp...25)) %>%
+  select(-(Plot:Temp...25)) %>%
+  filter(stage1!="X"&stage2!="X") %>% # Removing rows with all stages as "X"
+  mutate(temp1=ifelse(temp1>80,8.7,temp1)) # Correct error in temp1
+# Temperature measured two times, at the beginning and end of the season
+# (temp1 and temp2) --> calculate temp
+ping_18 <- ping_18 %>% 
+  mutate(temp=ifelse(is.na(temp1),temp2, # usetemp2 when temp1 is NA
+                     ifelse(is.na(temp2),temp1, # use temp1 when temp2 is NA
+                            (temp1+temp2)/2))) %>% # otherwise use mean
+  select(-temp1) %>% # Remove columns
+  select(-(date9:temp2))
+```
+
+```{r}
+ping_20 <- ping_20 %>% 
+  mutate(plot=as.factor(Plot),id=`# 2020`,x=as.numeric(X),y=as.numeric(Y),
+         peak=ifelse(`Peak/Aborted/Stem gone`=="-",0,1),
+         comments=Comments,
+         start_treatment=as.Date(`Start of treatment`,format="%d.%m.%y"),
+         treatment=as.factor(ifelse(Treatment=="0",NA,Treatment)),
+         date1=as.Date(`Week 3`,format="%d.%m.%y"),stage1=Stage...10,
+         temp1=as.numeric(`°C Preliminary 2020`),
+         date2=as.Date(`Week 4`,format="%d.%m.%y"),stage2=Stage...13,
+         date3=as.Date(`Week 5`,format="%d.%m.%y"),stage3=Stage...15,
+         date4=as.Date(`Week 6`,format="%d.%m.%y"),stage4=Stage...17,
+         date5=as.Date(`Week 7`,format="%d/%m/%y"),stage5=Stage...19,
+         temp2=as.numeric(`Temp 1`),
+         date6=as.Date(`Week 8`,format="%d/%m/%y"),stage6=Stage...22,
+         date7=as.Date(`Week 9`,format="%d/%m/%y"),stage7=Stage...24,
+         date8=as.Date(`Week 10`,format="%d/%m/%y"),stage8=Stage...26,
+         date9=as.Date(`Week 11`,format="%d.%m.%y"),stage9=Stage...28,
+         date10=as.Date(`Week 12`,format="%d/%m/%y"),stage10=Stage...30,
+         date11=as.Date(`Week 13`,format="%d/%m/%y"),
+         temp3=as.numeric(`Temp 2`),stage11=Stage...33,
+         date12=as.Date(`Weel 14`,format="%d/%m/%y"),stage12=Stage...35,
+         date13=as.Date(`Week 15`,format="%d/%m/%y"),stage13=Stage...37,
+         date14=as.Date(`Week 16`,format="%d.%m.%y"),stage14=Stage...39) %>%
+  select(-(Plot:Stage...39)) %>%
+  mutate(temp=ifelse(is.na(temp2)&is.na(temp3),temp1,
+                     ifelse(is.na(temp1),(temp2+temp3)/2,
+                            ifelse(is.na(temp2),(temp1+temp3)/2,
+                                   (temp1+temp2)/2)))) %>% 
+  select(-temp1) %>% # Remove columns
+  select(-temp2) %>%
+  select(-temp3) %>%
+  # Two plants that have peak=1, but in reality peak=0
+  mutate(peak=ifelse(id=="P-224"|id=="P-225",0,peak)) %>%
+  mutate(peak=as.factor(peak))
+```
+
+# Convert to long format and divide stage into real stage + grazing
+
+"stage" column contains info on stage:
+
+-   V (Vegetative) Only vegetative growth, the plant only has leaves
+-   B1 (Bud stage 1) Buds are just starting to form, very small, close to leaves
+-   B2 (Bud stage 2) Buds are at medium size
+-   B3 (Bud stage 3) Buds are large but still completely closed
+-   B4 (Bud stage 4) Buds are large and starting to open
+-   FL (Flowering) At least one flower has opened
+-   FL100 (100% flowering) All flowers have opened, none are yet wilted
+-   W (Wilted) At least one flower has wilted
+-   W100 (100% wilted) All flowers have wilted
+
+But also on grazing / lost and dead plants:
+
+-   X (Lost) Neither plant nor nail was not found that day
+
+-   D (Dead) Plant still in place but dead
+
+-   G (Grazed/gone) Nail was found but no sign of plant
+
+-   SG (Stem grazed/gone) All stems grazed/gone but with visible stubs
+
+-   /G (Grazing damage) One or more stems have been grazed but there are still some left, phenology is measured for the one that is most mature
+
+Separate info from "stage" column into "stage" and "graz" columns. Remove plants that did not flower (where there is no record with stages FL or FL100 or W or W100). 
+
+```{r}
+ping_17_long <- full_join(
+  ping_17 %>% 
+    pivot_longer(cols=starts_with("date"),names_to="revision",
+                 names_prefix="date",values_to="date") %>%
+    select(plot,id,x,y,comments,temp,revision,date),
+  ping_17 %>% 
+    pivot_longer(cols=starts_with("stage"),names_to="revision",
+                 names_prefix="stage",values_to="stage") %>%
+    select(plot,id,x,y,comments,temp,revision,stage)
+  ) %>%
+  separate(stage,into=c("stage","graz"),sep="/") %>%
+  mutate(stage=ifelse(stage=="FL50","FL",ifelse(stage=="GL","FL",stage))) 
+# One record with stage=FL50 --> changed to stage=FL
+# One record with stage="GL" - I suppose it is "FL" --> changed to this
+
+nrow(ping_17_long%>%distinct(id)) # 405 ids
+
+ids_fl_17 <- filter(ping_17_long, stage %in% c("FL","FL100","W","W100"))%>%
+  distinct(id) 
+nrow(ids_fl_17) # 292 ids that flowered
+  
+ping_17_long <- ping_17_long %>%
+  filter(id %in% as.vector(ids_fl_17$id))
+
+length(unique(ping_17_long$id)) # Now including only the 292 ids that flowered
+
+ping_17_long$graz <- with(ping_17_long,
+                          ifelse(stage %in% c("SG","D","G","X"),
+                            stage,graz)) # Info that should be on "graz" column
+ping_17_long$stage  <- with(ping_17_long,
+                          ifelse(stage %in% c("SG","D","G","X"),
+                            NA,stage))
+
+unique(ping_17_long$stage) # Now correct info on "stage"
+unique(ping_17_long$graz) # and on "graz"
+```
+```{r}
+ping_18_long <- full_join(
+  ping_18 %>% 
+    pivot_longer(cols=starts_with("date"),names_to="revision",
+                 names_prefix="date",values_to="date") %>%
+    select(plot,id,x,y,comments,temp,revision,date),
+  ping_18 %>% 
+    pivot_longer(cols=starts_with("stage"),names_to="revision",
+                 names_prefix="stage",values_to="stage") %>%
+    select(plot,id,x,y,comments,temp,revision,stage)
+  ) %>%
+  mutate(stage=ifelse(stage=="N/A",NA,stage)) %>%
+# One record with stage=N/A --> changed to stage=NA
+  separate(stage,into=c("stage","graz"),sep="/")
+  
+nrow(ping_18_long%>%distinct(id)) # 373 ids
+
+ids_fl_18 <- filter(ping_18_long, stage %in% c("FL","FL100","W","W100"))%>%
+  distinct(id) 
+nrow(ids_fl_18) # 201 ids that flowered
+  
+ping_18_long <- ping_18_long %>%
+  filter(id %in% as.vector(ids_fl_18$id))
+
+length(unique(ping_18_long$id)) # Now including only the 201 ids that flowered
+
+ping_18_long$graz <- with(ping_18_long,
+                          ifelse(stage %in% c("SG","D","G","X"),
+                            stage,graz)) # Info that should be on "graz" column
+ping_18_long$stage  <- with(ping_18_long,
+                          ifelse(stage %in% c("SG","D","G","X"),
+                            NA,stage))
+
+unique(ping_18_long$stage) # Now correct info on "stage"
+unique(ping_18_long$graz) # and on "graz"
+```
+```{r}
+ping_20_long <- full_join(
+  ping_20 %>% 
+    pivot_longer(cols=starts_with("date"),names_to="revision",
+                 names_prefix="date",values_to="date") %>%
+    select(plot,id,x,y,comments,temp,revision,date),
+  ping_20 %>% 
+    pivot_longer(cols=starts_with("stage"),names_to="revision",
+                 names_prefix="stage",values_to="stage") %>%
+    select(plot,id,x,y,comments,temp,revision,stage)
+  ) %>%
+  # Make stages similar to previous years
+  mutate(stage=ifelse(stage=="F","FL",stage)) %>%
+  mutate(stage=ifelse(stage=="F1/1","FL100",stage)) %>%
+  mutate(stage=ifelse(stage=="F/1/1","FL100",stage)) %>%
+  mutate(stage=ifelse(stage=="F1/2","FL",stage)) %>%
+  mutate(stage=ifelse(stage=="F1/1/SG","FL100/SG",stage)) %>%
+  mutate(stage=ifelse(stage=="F2/2","FL100",stage)) %>%
+  mutate(stage=ifelse(stage=="F2/3","FL",stage)) %>%
+  mutate(stage=ifelse(stage=="F1/1/","FL100",stage)) %>%
+  mutate(stage=ifelse(stage=="F1/3","FL",stage)) %>%
+  mutate(stage=ifelse(stage=="W00","W100",stage)) %>% # Correct error
+  mutate(stage=ifelse(stage=="S100","W100",stage)) %>% # Correct error
+  separate(stage,into=c("stage","graz"),sep="/")
+  
+nrow(ping_20_long%>%distinct(id)) # 450 ids
+
+ids_fl_20 <- filter(ping_20_long, stage %in% c("FL","FL100","W","W100"))%>%
+  distinct(id) 
+nrow(ids_fl_20) # 287 ids that flowered
+  
+ping_20_long <- ping_20_long %>%
+  filter(id %in% as.vector(ids_fl_20$id))
+
+length(unique(ping_20_long$id)) # Now including only the 287 ids that flowered
+
+ping_20_long$graz <- with(ping_20_long,
+                          ifelse(stage %in% c("SG","D","G","X"),
+                            stage,graz)) # Info that should be on "graz" column
+ping_20_long$stage  <- with(ping_20_long,
+                          ifelse(stage %in% c("SG","D","G","X"),
+                            NA,stage))
+
+unique(ping_20_long$stage) # Now correct info on "stage"
+unique(ping_20_long$graz) # and on "graz"
+```
+
+# Create column for vegetative / flowering
+
+```{r}
+ping_17_long <- ping_17_long %>%
+  mutate(V_F=ifelse(stage %in% c("V","B1","B2","B3","B4"),"V",
+                    ifelse(stage %in% c("FL","FL100","W","W100"),"F",NA)))
+```
+
+```{r}
+ping_18_long <- ping_18_long %>%
+  mutate(V_F=ifelse(stage %in% c("V","B1","B2","B3","B4"),"V",
+                    ifelse(stage %in% c("FL","FL100","W","W100"),"F",NA)))
+```
+
+```{r}
+ping_20_long <- ping_20_long %>%
+  mutate(V_F=ifelse(stage %in% c("V","B1","B2","B3","B4"),"V",
+                    ifelse(stage %in% c("FL","FL100","W","W100"),"F",NA)))
+```
+
+# Calculate FFD (mean and corrected)
+
+Get date for last recording with buds and first recording with flowers. Calculate FFD_meanDOY as the mean date between last recording with buds and first recording with flowers.
+
+```{r message=FALSE, warning=FALSE}
+# Calculate date when the plant was first recorded as flowering
+date_firstF_17  <- ping_17_long %>%
+  group_by(id) %>%
+  filter(V_F=="F") %>%
+  filter(date==min(date)) %>%
+  mutate(date_firstF=date) %>%
+  select(id,date_firstF)
+
+# Calculate date when the plant was last recorded as vegetative
+# (before being recorded as flowering)
+date_lastV_17  <- ping_17_long %>%
+  group_by(id) %>%
+  filter(V_F=="V") %>%
+  full_join(date_firstF_17) %>%
+  filter(date<=date_firstF) %>% 
+  # Remove records after first record with flowers
+  filter(date==max(date)) %>%
+  mutate(date_lastV=date) %>%
+  select(id,date_lastV)
+
+ping_17_FFD <- ping_17_long %>%
+  select(id,date,stage,V_F) %>%
+  filter(!is.na(V_F)) %>%
+  left_join(date_firstF_17) %>%
+  filter(date<=date_firstF) %>% 
+  # Remove records after first record with flowers
+  left_join(date_lastV_17) %>%
+  filter(date>=date_lastV|is.na(date_lastV)) %>%
+  # Remove records before last record without flowers
+  pivot_wider(id_cols=id,names_from=V_F,
+              values_from=c(stage,date_firstF,date_lastV)) %>%
+  select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
+  rename(date_firstF=date_firstF_F,date_lastV=date_lastV_V) %>%
+  ungroup() %>%
+  arrange(id) %>%
+  mutate(date_firstF=yday(date_firstF),date_lastV=yday(date_lastV)) %>%
+  # Change to julian dates
+  mutate(FFD_meanDOY=ifelse(is.na(date_lastV),date_firstF-3.9, 
+                            # Calculate first estimate of FFD:
+                            # For those flowering in first revision
+                            # assigned FFD as half a mean interval
+                            # date_firstF-(7.8/2)=date_firstF-3.9
+                            (date_lastV+date_firstF)/2)) %>%
+  # For others, assigned FFD_meanDOY as mean of date_lastV and date_firstF
+  mutate(interval=date_firstF-date_lastV) %>%
+  # Interval between 3 and 14 days (mean=7.8 days)
+  mutate(term_lastV=ifelse(stage_V=="V"|stage_V=="B1",0.2*interval,
+                    ifelse(stage_V=="B2",0*interval,
+                    ifelse(stage_V=="B3"|stage_V=="B4",-0.2*interval,NA))),
+         term_firstF=ifelse(stage_F=="FL"|stage_F=="FL100",0.2*interval,
+                     ifelse(stage_F=="W"|stage_F=="W100",-0.2*interval,NA))) %>% 
+  # Calculate terms to add for correcting FFD
+  mutate(FFD_corr=ifelse(is.na(date_lastV),FFD_meanDOY-2.34, 
+                         # Calculate corrected FFD:
+  # For those flowering in first revision, stage_F is FL or FL100
+  # FFD_corr is calculated as FFD_meanDOY-(7.8/2)+0.2*7.8 = FFD_meanDOY-2.34
+  # (Supposing the mean duration of the interval 
+  # and adding a term based on flowering stage)                        
+                        FFD_meanDOY+term_lastV+term_firstF))
+  # For others, FFD_cor is FFD_meanDOY + both terms
+```
+
+```{r message=FALSE, warning=FALSE}
+# Calculate date when the plant was first recorded as flowering
+date_firstF_18  <- ping_18_long %>%
+  group_by(id) %>%
+  filter(V_F=="F") %>%
+  filter(date==min(date)) %>%
+  mutate(date_firstF=date) %>%
+  select(id,date_firstF)
+
+# Calculate date when the plant was last recorded as vegetative
+# (before being recorded as flowering)
+date_lastV_18  <- ping_18_long %>%
+  group_by(id) %>%
+  filter(V_F=="V") %>%
+  full_join(date_firstF_18) %>%
+  filter(date<=date_firstF) %>% 
+  # Remove records after first record with flowers
+  filter(date==max(date)) %>%
+  mutate(date_lastV=date) %>%
+  select(id,date_lastV)
+
+ping_18_FFD <- ping_18_long %>%
+  select(id,date,stage,V_F) %>%
+  filter(!is.na(V_F)) %>%
+  left_join(date_firstF_18) %>%
+  filter(date<=date_firstF) %>% 
+  # Remove records after first record with flowers
+  left_join(date_lastV_18) %>%
+  filter(date>=date_lastV|is.na(date_lastV)) %>%
+  # Remove records before last record without flowers
+  pivot_wider(id_cols=id,names_from=V_F,
+              values_from=c(stage,date_firstF,date_lastV)) %>%
+  select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
+  rename(date_firstF=date_firstF_F,date_lastV=date_lastV_V) %>%
+  ungroup() %>%
+  arrange(id) %>%
+  mutate(date_firstF=yday(date_firstF),date_lastV=yday(date_lastV)) %>%
+  # Change to julian dates
+  mutate(FFD_meanDOY=ifelse(is.na(date_lastV),date_firstF-3.6, 
+                            # Calculate first estimate of FFD:
+                            # For those flowering in first revision
+                            # assigned FFD as half a mean interval
+                            # date_firstF-(7.2/2)=date_firstF-3.6
+                            (date_lastV+date_firstF)/2)) %>%
+  # For others, assigned FFD_meanDOY as mean of date_lastV and date_firstF
+  mutate(interval=date_firstF-date_lastV) %>%
+  # Interval between 4 and 12 days (mean=7.2 days)
+  mutate(term_lastV=ifelse(stage_V=="V"|stage_V=="B1",0.2*interval,
+                    ifelse(stage_V=="B2",0*interval,
+                    ifelse(stage_V=="B3"|stage_V=="B4",-0.2*interval,NA))),
+         term_firstF=ifelse(stage_F=="FL"|stage_F=="FL100",0.2*interval,
+                     ifelse(stage_F=="W"|stage_F=="W100",-0.2*interval,NA))) %>% 
+  # Calculate terms to add for correcting FFD
+  mutate(FFD_corr=ifelse(is.na(date_lastV),FFD_meanDOY-2.16, 
+                         # Calculate corrected FFD:
+  # For those flowering in first revision, stage_F is FL or FL100
+  # FFD_corr is calculated as FFD_meanDOY-(7.2/2)+0.2*7.2 = FFD_meanDOY-2.16
+  # (Supposing the mean duration of the interval 
+  # and adding a term based on flowering stage)                        
+                        FFD_meanDOY+term_lastV+term_firstF))
+  # For others, FFD_cor is FFD_meanDOY + both terms
+```
+
+```{r message=FALSE, warning=FALSE}
+# Calculate date when the plant was first recorded as flowering
+date_firstF_20  <- ping_20_long %>%
+  group_by(id) %>%
+  filter(V_F=="F") %>%
+  filter(date==min(date)) %>%
+  mutate(date_firstF=date) %>%
+  select(id,date_firstF)
+
+# Calculate date when the plant was last recorded as vegetative
+# (before being recorded as flowering)
+date_lastV_20  <- ping_20_long %>%
+  group_by(id) %>%
+  filter(V_F=="V") %>%
+  full_join(date_firstF_20) %>%
+  filter(date<=date_firstF) %>% 
+  # Remove records after first record with flowers
+  filter(date==max(date)) %>%
+  mutate(date_lastV=date) %>%
+  select(id,date_lastV)
+
+ping_20_FFD <- ping_20_long %>%
+  select(id,date,stage,V_F) %>%
+  filter(!is.na(V_F)) %>%
+  left_join(date_firstF_20) %>%
+  filter(date<=date_firstF) %>% 
+  # Remove records after first record with flowers
+  left_join(date_lastV_20) %>%
+  filter(date>=date_lastV|is.na(date_lastV)) %>%
+  # Remove records before last record without flowers
+  pivot_wider(id_cols=id,names_from=V_F,
+              values_from=c(stage,date_firstF,date_lastV)) %>%
+  select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
+  rename(date_firstF=date_firstF_F,date_lastV=date_lastV_V) %>%
+  ungroup() %>%
+  arrange(id) %>%
+  mutate(date_firstF=yday(date_firstF),date_lastV=yday(date_lastV)) %>%
+  # Change to julian dates
+  mutate(FFD_meanDOY=ifelse(is.na(date_lastV),date_firstF-3.7, 
+                            # Calculate first estimate of FFD:
+                            # For those flowering in first revision
+                            # assigned FFD as half a mean interval
+                            # date_firstF-(7.3/2)=date_firstF-3.7
+                            (date_lastV+date_firstF)/2)) %>%
+  # For others, assigned FFD_meanDOY as mean of date_lastV and date_firstF
+  mutate(interval=date_firstF-date_lastV) %>%
+  # Interval between 4 and 10 days (mean=7.3 days)
+  mutate(term_lastV=ifelse(stage_V=="V"|stage_V=="B1",0.2*interval,
+                    ifelse(stage_V=="B2",0*interval,
+                    ifelse(stage_V=="B3"|stage_V=="B4",-0.2*interval,NA))),
+         term_firstF=ifelse(stage_F=="FL"|stage_F=="FL100",0.2*interval,
+                     ifelse(stage_F=="W"|stage_F=="W100",-0.2*interval,NA))) %>% 
+  # Calculate terms to add for correcting FFD
+  mutate(FFD_corr=ifelse(is.na(date_lastV),FFD_meanDOY-2.19, 
+                         # Calculate corrected FFD:
+  # For those flowering in first revision, stage_F is FL or FL100
+  # FFD_corr is calculated as FFD_meanDOY-(7.3/2)+0.2*7.3 = FFD_meanDOY-2.19
+  # (Supposing the mean duration of the interval 
+  # and adding a term based on flowering stage)                        
+                        FFD_meanDOY+term_lastV+term_firstF))
+  # For others, FFD_cor is FFD_meanDOY + both terms
+```
+
+# Add info on peak
+
+```{r}
+ping_17_peak <- ping_17_peak %>% 
+  mutate(plot=as.factor(Plot),id=Indv,date_peak=as.Date(Date,format="%d.%m.%y"),
+         dm1=`Rosette dm1`,dm2=`Rosette dm2`,n_stems=`Nr. flowerstems`,
+         max_h=`Max height`,med_h=`Median height`,comments_peak=Comments) %>%
+  select(-(Plot:Comments)) %>%
+  mutate(n_stems=as.integer(ifelse(n_stems=="N/A",NA,n_stems)),
+         max_h=as.numeric(ifelse(max_h=="N/A",NA,max_h)),
+         med_h=as.numeric(ifelse(med_h=="N/A"|med_h=="missing",NA,med_h)))
+```
+
+```{r}
+ping_18_peak <- ping_18_peak %>% 
+  mutate(plot=as.factor(Plot),id=Indv,date_peak=as.Date(Date,format="%d.%m.%y"),
+         dm1=`Rosette dm1`,dm2=`Rosette dm2`,n_stems=`Nr. flowerstems`,
+         max_h=`Max height`,med_h=`Median height`,comments_peak=Comments) %>%
+  select(-(Plot:Comments)) %>%
+  # Correct errors in max_h and med_h and make numeric vars
+  mutate(max_h=str_remove(max_h,"\"")) %>%
+  mutate(max_h=str_remove(max_h,"\"")) %>%
+  mutate(med_h=str_remove(med_h,"\"")) %>%
+  mutate(med_h=str_remove(med_h,"\"")) %>%
+  mutate(max_h=as.numeric(ifelse(max_h=="N/A",NA,max_h))) %>%
+  mutate(med_h=as.numeric(ifelse(med_h=="N/A",NA,med_h)))
+```
+
+```{r}
+ping_20_peak <- ping_20_peak %>% 
+  mutate(plot=as.factor(Plot),id=Indv.,
+         F_NF=`F/NF/A (Flowering/Not Flowering/Aborted)`,
+         date_peak=as.Date(Date,format="%d.%m.%y"),
+         dm1=`Rosette 1`,dm2=`Rosette 2`,n_stems=`# stems`,
+         h_stem1=`Stem 1`,h_stem2=`Stem 2`,h_stem3=`Stem 3`,h_stem4=`Stem 4`,
+         h_stem5=`Stem 5`,n_seedpods=`Total fruits developed (end of season)`,
+         n_seeds=`Total seeds`,comments_peak=`Comments on individual`,
+         comments_seeds=`Comments on seedcounts`) %>%
+  mutate(h_stem1=ifelse(h_stem1==60,6,h_stem1)) %>% # Correct wrong value
+  select(-(Plot:`Comments on seedcounts`)) %>%
+  # Assign 0 seed pods to plants recorded as flowering with no info on seedpods
+  mutate(n_seedpods=ifelse(F_NF=="F"&is.na(n_seedpods),0,n_seedpods)) %>%
+  rowwise %>%
+  mutate(max_h=ifelse(is.na(h_stem1),NA,max(c_across(h_stem1:h_stem5),
+                                            na.rm=T))) %>%
+  mutate(med_h=ifelse(is.na(h_stem1),NA,mean(c_across(h_stem1:h_stem5),
+                                             na.rm=T))) %>%
+  select(-(h_stem1:h_stem5)) %>%
+  select(-F_NF)
+```
+
+# Add info on seedpods and seeds
+
+```{r}
+ping_17_seeds <- ping_17_seeds %>%
+  mutate(plot=as.factor(Plot),id=`#`,n_seedpods=`Tot. sp`,
+         coll_seedpods=`Coll. sp`,n_seeds=`n seeds`,
+         comments_seeds=`Malin´s comments`) %>%
+  select(-(Plot:`Malin´s comments`))
+nrow(filter(ping_17_seeds,n_seedpods!=coll_seedpods))
+# Always collected all seedpods
+```
+
+```{r}
+ping_17_seedpods <- ping_17_seedpods %>%
+  mutate(id=`#`,F_NF=`F/NF (Flowering/Not Flowering)`,
+         n_seedpods=`Total seedpods`) %>%
+  select(-(Plot:Comments)) %>%
+  # Assign 0 seed pods to plants recorded as flowering with no info on seedpods
+  mutate(n_seedpods=ifelse(F_NF=="F"&is.na(n_seedpods),0,n_seedpods))
+```
+
+
+```{r}
+ping_18_seeds <- ping_18_seeds %>%
+  mutate(plot=as.factor(Plot),id=`#`,
+         n_seedpods=`Collected seedpods`, # Assuming this is true so far
+         n_seeds=`Total seedcount`,comments_seeds=`Comments`) %>%
+  select(-(Plot:`Comments`)) %>%
+  # Assign zero seeds to plants with zero seedpods
+  mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds))
+```
+
+For 2020, info on seeds included in peak file.
+
+# Merge all data
+
+```{r}
+ping_17_data <- left_join((ping_17_FFD %>% 
+                             select(id,FFD_corr)),
+                          (ping_17 %>% 
+                             select(plot,id,x,y,peak,comments,temp)))%>%
+  left_join(ping_17_peak) %>%
+  left_join(ping_17_seedpods %>% select (id,n_seedpods)) %>%
+  left_join(ping_17_seeds %>% select(plot,id,n_seeds,comments_seeds)) %>%
+  # Assign zero seeds to plants with zero seedpods
+  mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds)) %>%
+  mutate(n_stems=ifelse(n_stems==21,2,n_stems)) # Fix error in n_stems
+nrow(ping_17_data)
+# 292 ids that flowered, 
+nrow(ping_17_data %>% filter(peak==1))
+# Of which 280 with info on peak
+nrow(ping_17_data %>% filter(!is.na(n_seeds)))
+# And 276 with info on seeds
+```
+
+```{r}
+ping_18_data <- left_join((ping_18_FFD %>% 
+                             select(id,FFD_corr)),
+                          (ping_18 %>% 
+                             select(plot,id,x,y,peak,comments,temp)))%>%
+  left_join(ping_18_peak) %>%
+  left_join(ping_18_seeds) 
+nrow(ping_18_data)
+# 201 ids that flowered, 
+nrow(ping_18_data %>% filter(peak==1))
+# Of which 201 with info on peak
+nrow(ping_18_data %>% filter(!is.na(n_seeds)))
+# And 199 with info on seeds
+```
+
+```{r}
+ping_20_data <- left_join((ping_20_FFD %>% 
+                             select(id,FFD_corr)),
+                          (ping_20 %>% 
+                             select(plot,id,x,y,peak,comments,start_treatment,
+                                    treatment,temp)))%>%
+  left_join(ping_20_peak) %>%
+  # Assign zero seeds to plants with zero seedpods
+  mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds))
+nrow(ping_20_data)
+# 287 ids that flowered, 
+nrow(ping_20_data %>% filter(peak==1))
+# Of which 284 with info on peak
+nrow(ping_20_data %>% filter(!is.na(n_seeds)))
+# And 135 with info on seeds
+```
+
+# Save clean data as .csv
+
+```{r}
+write_csv(ping_17_data,"data/clean/ping_17_data.csv")
+write_csv(ping_18_data,"data/clean/ping_18_data.csv")
+write_csv(ping_20_data,"data/clean/ping_20_data.csv")
+```
+
+```{r}
+sessionInfo()
+```
+

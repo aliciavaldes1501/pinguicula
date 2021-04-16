@@ -1,0 +1,149 @@
+---
+title: "Response of Pinguicula vulgaris to geothermal heating"
+subtitle: "Analyses"
+author : "Alicia Valdés"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: 4
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(tibble.width = Inf)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r load packages, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(jtools)
+library(RColorBrewer)
+library(gridExtra)
+library(ggeffects)
+library(DHARMa)
+```
+
+```{r Define ggplot themes and palettes, include=FALSE}
+my_theme <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(legend.position="none")+theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+my_theme_legend <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+myPalette <- colorRampPalette(brewer.pal(11, "YlOrRd"))
+```
+
+# Read clean data from .csv files
+
+```{r}
+ping_17_data <- read_csv("data/clean/ping_17_data.csv")
+ping_18_data <- read_csv("data/clean/ping_18_data.csv")
+ping_20_data <- read_csv("data/clean/ping_20_data.csv")
+```
+
+# Variable distributions
+
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=FFD_corr))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=FFD_corr))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=FFD_corr))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+```
+
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=temp))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=temp))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=temp))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+```
+
+# 1. Effect of temperature on FFD
+
+## Fit linear models
+
+Not including number of flowers as covariate, including quadratic effects of ffd.
+
+```{r echo=TRUE}
+FFD_2017_1<-lm(FFD_corr~temp+I(temp^2),ping_17_data)
+summ(FFD_2017_1,vif=T,scale=T) # scale=T reports standardized coefs
+FFD_2018_1<-lm(FFD_corr~temp+I(temp^2),ping_18_data)
+summ(FFD_2018_1,vif=T,scale=T) # scale=T reports standardized coefs
+FFD_2020_1<-lm(FFD_corr~temp+I(temp^2),ping_20_data)
+summ(FFD_2020_1,vif=T,scale=T) # scale=T reports standardized coefs
+```
+
+Quadratic effects significant in 2018 and 2020, but not on 2017.
+
+Refit model for 2017 withouth quadratic term of ffd.
+
+```{r echo=TRUE}
+FFD_2017_2<-lm(FFD_corr~temp,ping_17_data)
+summ(FFD_2017_2,scale=T)
+```
+
+## Model predictions
+
+```{r}
+plot(ggpredict(FFD_2017_2),add.data=T)
+plot(ggpredict(FFD_2018_1),add.data=T)
+plot(ggpredict(FFD_2020_1),add.data=T)
+```
+
+The effects look almost linear in 2018 and 2020.
+
+Predictions of FFD_corr for minimum and maximum temperatures:
+
+```{r}
+ggpredict(FFD_2017_2,terms="temp[minmax]")
+# 187.26-158.67=28.59 days earlier on warmer soils
+ggpredict(FFD_2018_1,terms="temp[minmax]") 
+# 196.72-154.57=42.15 days earlier on warmer soils
+ggpredict(FFD_2020_1,terms="temp[minmax]") 
+# 190.85-155.16=35.69 days earlier on warmer soils
+```
+
+## Model diagnostics
+
+```{r}
+simOutput_FFD_2017_2<-simulateResiduals(fittedModel=FFD_2017_2,
+                                               n=5000)
+simOutput_FFD_2018_1<-simulateResiduals(fittedModel=FFD_2018_1,
+                                               n=5000)
+simOutput_FFD_2020_1<-simulateResiduals(fittedModel=FFD_2020_1,
+                                               n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_FFD_2017_2)
+plot(simOutput_FFD_2018_1)
+plot(simOutput_FFD_2020_1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+sessionInfo()
+```
+
