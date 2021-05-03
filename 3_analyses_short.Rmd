@@ -1,0 +1,624 @@
+---
+title: "Response of Pinguicula vulgaris to geothermal heating"
+subtitle: "Analyses"
+author : "Alicia Valdés"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: 4
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(tibble.width = Inf)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE) 
+options("jtools-digits" = 3)
+options(pillar.sigfigs=6)
+```
+
+```{r load packages, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(jtools)
+library(RColorBrewer)
+library(gridExtra)
+library(ggeffects)
+library(DHARMa)
+library(ggthemes)
+library(MASS)
+library(glmmTMB)
+library(broom.mixed)
+```
+
+```{r Define ggplot themes and palettes, include=FALSE}
+my_theme <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(legend.position="none")+theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+my_theme_legend <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+myPalette <- colorRampPalette(brewer.pal(11, "YlOrRd"))
+```
+
+```{r load previously saved objects, include=FALSE}
+load("output/BCIs_selection_2017_1.RData")
+load("output/BCIs_selection_2018_1.RData")
+load("output/BCIs_selection_2020_1.RData")
+load("output/BCIs_selection_2020_C_1.RData")
+load("output/BCIs_selection_2020_2.RData")
+load("output/BCIs_selection_2020_3.RData")
+load("output/BCIs_selection_2020_4.RData")
+load("output/BCIs_selection_2020_5.RData")
+load("output/BCIs_selection_2020_6.RData")
+```
+
+```{r include=FALSE}
+ping_17_data <- read_csv("data/clean/ping_17_data.csv")
+ping_18_data <- read_csv("data/clean/ping_18_data.csv")
+ping_20_data <- read_csv("data/clean/ping_20_data.csv")
+```
+
+```{r include=FALSE}
+ping_17_data$ros_area <- with(ping_17_data,pi*dm1*dm2)
+ping_18_data$ros_area <- with(ping_18_data,pi*dm1*dm2)
+ping_20_data$ros_area <- with(ping_20_data,pi*dm1*dm2)
+```
+
+```{r include=FALSE}
+ping_17_data$tot_h <- with(ping_17_data,med_h*n_stems)
+ping_18_data$tot_h <- with(ping_18_data,med_h*n_stems)
+ping_20_data$tot_h <- with(ping_20_data,med_h*n_stems)
+```
+
+# Variable distributions
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=FFD_corr))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=FFD_corr))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=FFD_corr))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="FFD")
+```
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=temp))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=temp))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=temp))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Soil temperature")
+```
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=n_stems))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=n_stems))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=n_stems))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Number of flowering stems")
+```
+
+Most of them have 1 flowering stem, and the variation is not so large. Probably use another condition variable.
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=max_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=max_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=max_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Maximum height")
+```
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=med_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=med_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=med_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Median height")
+```
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=tot_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=tot_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=tot_h))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Total height = Median height * number of flowering stems")
+grid.arrange(
+  ggplot(ping_17_data,aes(x=log(tot_h)))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=log(tot_h)))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=log(tot_h)))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Total height (log)")
+```
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=ros_area))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=ros_area))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=ros_area))+
+    geom_histogram(color="black",fill="grey")+my_theme()+ylab(NULL)+
+    ggtitle("2020"),
+  ncol=3,top="Rosette area")
+grid.arrange(
+  ggplot(ping_17_data,aes(x=log(ros_area)))+
+    geom_histogram(color="black",fill="grey")+my_theme()+
+    ylab(NULL)+ggtitle("2017"),
+  ggplot(ping_18_data,aes(x=log(ros_area)))+
+    geom_histogram(color="black",fill="grey")+my_theme()+
+    ylab(NULL)+ggtitle("2018"),
+  ggplot(ping_20_data,aes(x=log(ros_area)))+
+    geom_histogram(color="black",fill="grey")+my_theme()+
+    ylab(NULL)+ggtitle("2020"),
+  ncol=3,top="Rosette area (log)")
+```
+
+# Relationships bewteen fitness and condition variables
+
+Chose between maximum height, median height, rosette area (log) and total height (log) as condition variables.
+
+Used first Poisson models, but they showed significant overdispersion and zero-inflation. Best fitting models were zero-inflated negative binomial GLMs, so I used those
+
+## Maximum height
+
+```{r message=FALSE, warning=FALSE}
+cond1_17<-glmmTMB(n_seeds~max_h,ziformula=~1,family="nbinom2",ping_17_data)
+cond1_18<-glmmTMB(n_seeds~max_h,ziformula=~1,family="nbinom2",ping_18_data)
+cond1_20<-glmmTMB(n_seeds~max_h,ziformula=~1,family="nbinom2",ping_20_data)
+```
+
+```{r}
+summary(cond1_17)
+summary(cond1_18)
+summary(cond1_20)
+```
+
+## Median height
+
+```{r message=FALSE, warning=FALSE}
+cond2_17<-glmmTMB(n_seeds~med_h,ziformula=~1,family="nbinom2",ping_17_data)
+cond2_18<-glmmTMB(n_seeds~med_h,ziformula=~1,family="nbinom2",ping_18_data)
+cond2_20<-glmmTMB(n_seeds~med_h,ziformula=~1,family="nbinom2",ping_20_data)
+```
+
+```{r}
+summary(cond2_17)
+summary(cond2_18)
+summary(cond2_20)
+```
+
+## Rosette area (log)
+
+```{r message=FALSE, warning=FALSE}
+cond3_17<-glmmTMB(n_seeds~log(ros_area),ziformula=~1,family="nbinom2",
+                  ping_17_data)
+cond3_18<-glmmTMB(n_seeds~log(ros_area),ziformula=~1,family="nbinom2",
+                  ping_18_data)
+cond3_20<-glmmTMB(n_seeds~log(ros_area),ziformula=~1,family="nbinom2",
+                  ping_20_data)
+```
+
+```{r}
+summary(cond3_17)
+summary(cond3_18)
+summary(cond3_20)
+```
+
+## Total height (log)
+
+```{r message=FALSE, warning=FALSE}
+cond4_17<-glmmTMB(n_seeds~log(tot_h),ziformula=~1,family="nbinom2",
+                  ping_17_data)
+cond4_18<-glmmTMB(n_seeds~log(tot_h),ziformula=~1,family="nbinom2",
+                  ping_18_data)
+cond4_20<-glmmTMB(n_seeds~log(tot_h),ziformula=~1,family="nbinom2",
+                  ping_20_data)
+```
+
+```{r}
+summary(cond4_17)
+summary(cond4_18)
+summary(cond4_20)
+```
+
+Rosette area and total height have significant effects on fitness on the 3 years.Total height has larger effect sizes than rosette area in 2 out of 3 years (checked with models with scaled predictors, not shown). I decided to use total height as condition variable.
+
+# 1. Models for FFD 
+
+## 1.1. Effect of temperature on FFD
+
+Using linear models, including quadratic effects of temp (included first but removed in 2017 because they were not significant).
+
+```{r echo=TRUE}
+FFD_2017_1<-lm(FFD_corr~temp,ping_17_data)
+summary(FFD_2017_1)
+FFD_2018_1<-lm(FFD_corr~temp+I(temp^2),ping_18_data)
+summary(FFD_2018_1)
+FFD_2020_1<-lm(FFD_corr~temp+I(temp^2),ping_20_data)
+summary(FFD_2020_1)
+```
+
+Model diagnostics (not shown) indicated that linear models are OK.
+
+2017:
+
+```{r, fig.height=3, fig.width=4}
+plot(ggpredict(FFD_2017_1),add.data=T)
+```
+
+2018:
+
+```{r, fig.height=3, fig.width=4}
+plot(ggpredict(FFD_2018_1),add.data=T)
+```
+
+2020:
+
+```{r, fig.height=3, fig.width=4}
+plot(ggpredict(FFD_2020_1),add.data=T)
+```
+
+The effects look almost linear in 2018 and 2020.
+
+Predictions of FFD\_corr for minimum and maximum temperatures:
+
+```{r}
+ggpredict(FFD_2017_1,terms="temp[minmax]")
+# 187.26-158.67=28.59 days earlier on warmer soils
+ggpredict(FFD_2018_1,terms="temp[minmax]") 
+# 196.72-154.57=42.15 days earlier on warmer soils
+ggpredict(FFD_2020_1,terms="temp[minmax]") 
+# 190.85-155.16=35.69 days earlier on warmer soils
+```
+
+# 2. Models for fitness
+
+## 2.1 Effect of temperature on fitness
+
+### Fitness as number of seeds
+
+Including total height (log) as condition variable. I first included quadratic effects of temperature, but then removed them because they were never significant. I used only plants from control treatment in 2020. Using negative binomial GLMs with zero inflation (best fitting models).
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2017_1<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~1,
+                        ping_17_data,family="nbinom2")
+fitness_2018_1<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~1,
+                        ping_18_data,family="nbinom2")
+fitness_2020_1<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~1,
+                        subset(ping_20_data,treatment=="C"),family="nbinom2")
+```
+
+```{r}
+summary(fitness_2017_1)
+summary(fitness_2018_1)
+summary(fitness_2020_1)
+```
+
+Effect of temperature only significant in 2018.
+
+2018:
+
+```{r message=FALSE, warning=FALSE,fig.height=3, fig.width=4}
+plot(ggeffect(fitness_2018_1,type="zero_inflated",terms="temp"),
+     add.data=T) # * negative effect of temp
+```
+
+### Fitness as 0/1
+
+Proportion of plants in each year that produced 0 seeds:
+
+```{r}
+nrow(subset(ping_17_data,n_seeds==0))/nrow(ping_17_data)
+nrow(subset(ping_18_data,n_seeds==0))/nrow(ping_18_data)
+nrow(subset(ping_20_data,n_seeds==0))/nrow(ping_20_data)
+```
+
+Around half of the plants in each year produced no seeds.
+
+Therefore, I tried also fitting logistic regressions (binomial GLMs) with fitness as a 0/1 variable (0 = no seeds produced, 1 = at least 1 seed produced).
+
+Create 0/1 variable for fitness:
+
+```{r}
+ping_17_data$fitness_01<-with(ping_17_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+ping_18_data$fitness_01<-with(ping_18_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+ping_20_data$fitness_01<-with(ping_20_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+```
+
+Including total height (log) as condition variable. I first included quadratic effects of temperature, but then removed them because they were never significant. I used only plants from control treatment in 2020.
+
+```{r}
+fitness_01_2017_1<-glm(fitness_01~temp+log(tot_h),ping_17_data,
+                       family="binomial")
+fitness_01_2018_1<-glm(fitness_01~temp+log(tot_h),ping_18_data,
+                       family="binomial")
+fitness_01_2020_1<-glm(fitness_01~temp+log(tot_h),
+                   subset(ping_20_data,treatment=="C"),family="binomial")
+```
+
+```{r}
+summary(fitness_01_2017_1)
+summary(fitness_01_2018_1)
+summary(fitness_01_2020_1)
+```
+
+No significant effects.
+
+## 2.2. Effect of treatment on fitness (2020)
+
+### Fitness as number of seeds
+
+Using a negative binomial GLM with zero inflation. Including total height (log) as condition variable.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2020_treat<-glmmTMB(n_seeds~treatment+log(tot_h),ziformula=~1,
+                            ping_20_data,family="nbinom2")
+summary(fitness_2020_treat)
+```
+
+```{r message=FALSE, warning=FALSE,fig.height=3, fig.width=4}
+plot(ggeffect(fitness_2020_treat,term="treatment"),add.data=T)
+```
+
+Fitness significantly larger in pollination treatment than in control.
+
+### Fitness as 0/1
+
+Logistic regression (binomial GLM) with fitness as a 0/1 variable (0 = no seeds produced, 1 = at least 1 seed produced).
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_01_2020_treat<-glm(fitness_01~treatment+log(tot_h),ping_20_data,
+                           family="binomial")
+summary(fitness_01_2020_treat)
+```
+
+No significant effects.
+
+## 2.3. Effect of temperature AND treatment on fitness (2020)
+
+### Fitness as number of seeds
+
+Using a negative binomial GLM with zero inflation. Including total height (log) as condition variable. Including temperature and treatment as predictors both in the "count" part of the model and in the "zero-inflation" part of the model.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2020_temp_treat_2<-glmmTMB(n_seeds~temp*treatment+log(tot_h),
+                                   ziformula=~.,ping_20_data,family="nbinom2")
+summary(fitness_2020_temp_treat_2)
+```
+
+```{r message=FALSE, warning=FALSE,fig.height=3, fig.width=4}
+plot(ggpredict(fitness_2020_temp_treat_2,terms=c("temp","treatment"),
+               type="fixed"))
+plot(ggpredict(fitness_2020_temp_treat_2,terms=c("temp","treatment"),
+               type="zi_prob"))
+```
+
+First plot: fitness decreases with temperature only for plants in F treatment. This seems contrary what I would expect - see how can we explain this! Second plot: the probability of zero inflation is represented; values of 1 in the Y-axis indicate a 100% probability of zero inflation (i.e. of producing 0 seeds), so it is like an "inversed" logistic model. The probability of zero inflation decreases with temperature for plants in the PF treatment (and almost in the F treatment, p=0.07).In other words, the probability of producing seeds increases with temperature in those treatments. This agrees with my expectations, as pollination and prey supplementation might partly compensate for the maladaptive nature of plasticity on heated soils, "restoring" interactions that might be lost in these areas because of different sensitivities to warming between plants and interacting animals.
+
+### Fitness as 0/1
+
+Logistic regression (binomial GLM) with fitness as a 0/1 variable (0 = no seeds produced, 1 = at least 1 seed produced).
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_01_2020_temp_treat<-glm(fitness_01~temp*treatment+log(tot_h),
+                                ping_20_data,family="binomial")
+summary(fitness_01_2020_temp_treat)
+```
+
+```{r,fig.height=3, fig.width=4}
+plot(ggpredict(fitness_01_2020_temp_treat,terms=c("temp","treatment")))
+```
+
+The probability of producing seeds increases with temperature for plants in the PF treatment (and almost in the F treatment, p=0.07). This agrees with the results of the previous zero-inflated model and with my expectations.
+
+Relationship among fitness_01 and temp for the different treatments:
+
+```{r}
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="C"),
+            family="binomial"))
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="P"),
+            family="binomial"))
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="F"),
+            family="binomial"))
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="PF"),
+            family="binomial")) # +*
+```
+
+Effect of temperature only significant in the PF treatment.
+
+# 3. Selection models
+
+## 3.1. Effect of temperature on selection on FFD
+
+Standardize traits and relativize fitness:
+
+```{r}
+# Standardize FFD
+ping_17_data$FFD_corr_std<-as.numeric(scale(ping_17_data$FFD_corr))
+ping_18_data$FFD_corr_std<-as.numeric(scale(ping_18_data$FFD_corr))
+ping_20_data$FFD_corr_std<-as.numeric(scale(ping_20_data$FFD_corr))
+# Standardize total height (first log, then scale)
+ping_17_data$tot_h_std<-as.numeric(scale(log(ping_17_data$tot_h)))
+ping_18_data$tot_h_std<-as.numeric(scale(log(ping_18_data$tot_h)))
+ping_20_data$tot_h_std<-as.numeric(scale(log(ping_20_data$tot_h)))
+# Relativize fitness
+ping_17_data$n_seeds_rel<-with(ping_17_data,n_seeds/mean(n_seeds,na.rm=T))
+ping_18_data$n_seeds_rel<-with(ping_18_data,n_seeds/mean(n_seeds,na.rm=T))
+ping_20_data$n_seeds_rel<-with(ping_20_data,n_seeds/mean(n_seeds,na.rm=T))
+# ping_20_data, treament C
+ping_20_data_C<-subset(ping_20_data,treatment=="C")%>%
+  mutate(FFD_corr_std=as.numeric(scale(FFD_corr)),
+         tot_h_std=as.numeric(scale(log(tot_h))),
+         n_seeds_rel=n_seeds/mean(n_seeds,na.rm=T))
+```
+
+Using linear models. I first included quadratic effects of temperature, but then removed them because they were never significant. I used only plants from control treatment in 2020. 
+
+```{r}
+selection_2017_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                     subset(ping_17_data,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std)))
+selection_2018_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                     subset(ping_18_data,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std)))
+selection_2020_C_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                       subset(ping_20_data_C,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std))) 
+```
+
+Model diagnostics (not shown) looked bad, model residuals did not meet the assumption of normality, so using 95% bias‐corrected and accelerated (BCa) bootstrap intervals for the model estimates to determine significance. Same for all selection models below.
+
+```{r}
+summary(selection_2017_1)
+BCIs_selection_2017_1
+summary(selection_2018_1) 
+BCIs_selection_2018_1
+summary(selection_2020_C_1) 
+BCIs_selection_2020_C_1
+```
+
+```{r,fig.height=3, fig.width=4}
+plot(ggpredict(selection_2018_1,terms=c("temp"))) 
+plot(ggpredict(selection_2020_C_1,
+               terms=c("FFD_corr_std","temp")))
+```
+
+2018: higher fitness in colder soils. 2020: early flowering relatively more favoured in colder soils (similar to result for Cerastium but it seems that there is no selection on FFD in warmer soils here - if we look only at plants in the C treatment).
+
+## 3.2. Effect of treatment on selection on FFD (2020)
+
+Using a linear model.
+
+```{r}
+selection_2020_2<-lm(n_seeds_rel~FFD_corr_std*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+summary(selection_2020_2)
+BCIs_selection_2020_2
+```
+
+No significant effects (only total height).
+
+## 3.3. Effects of temperature AND treatment on selection on FFD (2020)
+
+Using a linear model.
+
+```{r}
+selection_2020_4<-lm(n_seeds_rel~temp*FFD_corr_std+treatment*FFD_corr_std+
+                       tot_h_std,subset(ping_20_data,
+                                        !is.na(n_seeds_rel)&!is.na(tot_h_std)))
+summary(selection_2020_4)
+BCIs_selection_2020_4
+```
+
+```{r,fig.height=3, fig.width=4}
+plot(ggpredict(selection_2020_4,terms=c("FFD_corr_std","temp")))
+```
+
+## 3.4. Effects of all 2-way interactions between temperature, treatment and FFD (2020)
+
+Using a linear model.
+
+```{r}
+selection_2020_5<-lm(n_seeds_rel~temp*FFD_corr_std+treatment*FFD_corr_std+
+                       temp*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+summary(selection_2020_5)
+BCIs_selection_2020_5
+```
+
+```{r,fig.height=3, fig.width=4}
+plot(ggpredict(selection_2020_5,terms=c("FFD_corr_std","temp")))
+plot(ggpredict(selection_2020_5,terms=c("temp","treatment"))) 
+```
+
+Similar result as in the model for fitness (section 2.3): Fitness increases with temperature in the PF treatment.
+
+## 3.5. Effects of all 2-way interactions between temperature, treatment and FFD + 3-way interaction (2020)
+
+Using a linear model.
+
+```{r}
+selection_2020_6<-lm(n_seeds_rel~temp*FFD_corr_std*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+summary(selection_2020_6)
+BCIs_selection_2020_6
+```
+
+2-way significant interactions:
+
+```{r,fig.height=3, fig.width=4}
+plot(ggpredict(selection_2020_6,terms=c("temp","FFD_corr_std")))
+plot(ggpredict(selection_2020_6,terms=c("temp","treatment")))
+```
+
+Similar results as before.
+
+3-way interaction (two different representations):
+
+```{r,fig.height=3, fig.width=7}
+plot(ggpredict(selection_2020_6,terms=c("FFD_corr_std","treatment","temp")))
+```
+
+At low temperatures (left panel above), it is always better to flower early. At medium and high temperatures (center and right panel above), it is better to flower early for plants in the C and F treatments, but better to flower late for plants in the P and PF treatments (only temp * FFD * treatmentP is significantly different from control).
+
+```{r,fig.height=4, fig.width=5}
+plot(ggpredict(selection_2020_6,terms=c("FFD_corr_std","temp","treatment")))
+```
+
+In other words, for plants in C and F treatments, it is always better to flower early, irrespective of soil temperature. For plants in P and PF treatments (only in P if we look at significance), it is better to flower early at cold soil temperatures, but late at warm soil temperatures.
+
+Do we want to include this 3-way interaction, or stay just with 2-way interactions?
+
+```{r eval=FALSE, include=FALSE}
+sessionInfo()
+```

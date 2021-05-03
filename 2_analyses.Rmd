@@ -24,6 +24,9 @@ library(RColorBrewer)
 library(gridExtra)
 library(ggeffects)
 library(DHARMa)
+library(ggthemes)
+library(MASS)
+library(glmmTMB)
 ```
 
 ```{r Define ggplot themes and palettes, include=FALSE}
@@ -40,12 +43,42 @@ my_theme_legend <- function(){
 myPalette <- colorRampPalette(brewer.pal(11, "YlOrRd"))
 ```
 
+```{r load previously saved objects}
+load("output/BCIs_selection_2017_1.RData")
+load("output/BCIs_selection_2018_1.RData")
+load("output/BCIs_selection_2020_1.RData")
+load("output/BCIs_selection_2020_C_1.RData")
+load("output/BCIs_selection_2020_2.RData")
+load("output/BCIs_selection_2020_3.RData")
+load("output/BCIs_selection_2020_4.RData")
+load("output/BCIs_selection_2020_5.RData")
+load("output/BCIs_selection_2020_6.RData")
+```
+
 # Read clean data from .csv files
 
 ```{r}
 ping_17_data <- read_csv("data/clean/ping_17_data.csv")
 ping_18_data <- read_csv("data/clean/ping_18_data.csv")
 ping_20_data <- read_csv("data/clean/ping_20_data.csv")
+```
+
+# Calculate rosette area
+
+```{r}
+ping_17_data$ros_area <- with(ping_17_data,pi*dm1*dm2)
+ping_18_data$ros_area <- with(ping_18_data,pi*dm1*dm2)
+ping_20_data$ros_area <- with(ping_20_data,pi*dm1*dm2)
+```
+
+# Calculate total height
+
+Median height * number of flowering stems.
+
+```{r}
+ping_17_data$tot_h <- with(ping_17_data,med_h*n_stems)
+ping_18_data$tot_h <- with(ping_18_data,med_h*n_stems)
+ping_20_data$tot_h <- with(ping_20_data,med_h*n_stems)
 ```
 
 # Variable distributions
@@ -66,11 +99,339 @@ grid.arrange(
   ncol=3)
 ```
 
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=n_stems))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=n_stems))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=n_stems))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+```
+
+Most of them have 1 flowering stem, and the variation is not so large. Maybe use another condition variable?
+
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=max_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=max_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=max_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+```
+
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=med_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=med_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=med_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+```
+
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=tot_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=tot_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=tot_h))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+grid.arrange(
+  ggplot(ping_17_data,aes(x=log(tot_h)))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=log(tot_h)))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=log(tot_h)))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+```
+
+```{r}
+grid.arrange(
+  ggplot(ping_17_data,aes(x=ros_area))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_18_data,aes(x=ros_area))+geom_histogram()+my_theme()+ylab(NULL),
+  ggplot(ping_20_data,aes(x=ros_area))+geom_histogram()+my_theme()+ylab(NULL),
+  ncol=3)
+grid.arrange(
+  ggplot(ping_17_data,aes(x=log(ros_area)))+geom_histogram()+my_theme()+
+    ylab(NULL),
+  ggplot(ping_18_data,aes(x=log(ros_area)))+geom_histogram()+my_theme()+
+    ylab(NULL),
+  ggplot(ping_20_data,aes(x=log(ros_area)))+geom_histogram()+my_theme()+
+    ylab(NULL),
+  ncol=3)
+```
+
+# Relationships fitness ~ condition variables
+
+Chose between max_h, med_h, ros_area (log) and tot_h (log) as condition variables.
+
+## Maximum height
+
+```{r}
+cond1_17<-glm(n_seeds~max_h,ping_17_data,family=poisson)
+cond1_18<-glm(n_seeds~max_h,ping_18_data,family=poisson)
+cond1_20<-glm(n_seeds~max_h,ping_20_data,family=poisson)
+```
+
+```{r}
+simOutput_cond1_17<-simulateResiduals(fittedModel=cond1_17,n=5000)
+simOutput_cond1_18<-simulateResiduals(fittedModel=cond1_18,n=5000)
+simOutput_cond1_20<-simulateResiduals(fittedModel=cond1_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond1_17)
+plot(simOutput_cond1_18)
+plot(simOutput_cond1_20)
+```
+
+Looking very bad!
+
+```{r}
+testDispersion(simOutput_cond1_17)
+testDispersion(simOutput_cond1_18)
+testDispersion(simOutput_cond1_20)
+```
+
+All models are overdispersed.
+
+```{r}
+testZeroInflation(simOutput_cond1_17)
+testZeroInflation(simOutput_cond1_18)
+testZeroInflation(simOutput_cond1_20)
+```
+
+There is significant zero inflation.
+
+Fit with zero inflation:
+
+```{r message=FALSE, warning=FALSE}
+cond1_17<-glmmTMB(n_seeds~max_h,ziformula=~1,family="poisson",ping_17_data)
+cond1_18<-glmmTMB(n_seeds~max_h,ziformula=~1,family="poisson",ping_18_data)
+cond1_20<-glmmTMB(n_seeds~max_h,ziformula=~1,family="poisson",ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond1_17<-simulateResiduals(fittedModel=cond1_17,n=5000)
+simOutput_cond1_18<-simulateResiduals(fittedModel=cond1_18,n=5000)
+simOutput_cond1_20<-simulateResiduals(fittedModel=cond1_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond1_17)
+plot(simOutput_cond1_18)
+plot(simOutput_cond1_20)
+```
+
+Looking a bit better but still bad
+
+Refit with negative binomial and no zero inflation:
+
+```{r message=FALSE, warning=FALSE}
+cond1_17<-glmmTMB(n_seeds~max_h,family="nbinom2",ping_17_data)
+cond1_18<-glmmTMB(n_seeds~max_h,family="nbinom2",ping_18_data)
+cond1_20<-glmmTMB(n_seeds~max_h,family="nbinom2",ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond1_17<-simulateResiduals(fittedModel=cond1_17,n=5000)
+simOutput_cond1_18<-simulateResiduals(fittedModel=cond1_18,n=5000)
+simOutput_cond1_20<-simulateResiduals(fittedModel=cond1_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond1_17)
+plot(simOutput_cond1_18)
+plot(simOutput_cond1_20)
+```
+Still looking bad.
+
+Refit with negative binomial and zero inflation:
+
+```{r message=FALSE, warning=FALSE}
+cond1_17<-glmmTMB(n_seeds~max_h,ziformula=~1,family="nbinom2",ping_17_data)
+cond1_18<-glmmTMB(n_seeds~max_h,ziformula=~1,family="nbinom2",ping_18_data)
+cond1_20<-glmmTMB(n_seeds~max_h,ziformula=~1,family="nbinom2",ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond1_17<-simulateResiduals(fittedModel=cond1_17,n=5000)
+simOutput_cond1_18<-simulateResiduals(fittedModel=cond1_18,n=5000)
+simOutput_cond1_20<-simulateResiduals(fittedModel=cond1_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond1_17)
+plot(simOutput_cond1_18)
+plot(simOutput_cond1_20)
+```
+
+Now looking good!
+
+```{r}
+summary(cond1_17)
+summary(cond1_18)
+summary(cond1_20)
+```
+
+## Median height
+
+```{r}
+cond2_17<-glm(n_seeds~med_h,ping_17_data,family=poisson)
+cond2_18<-glm(n_seeds~med_h,ping_18_data,family=poisson)
+cond2_20<-glm(n_seeds~med_h,ping_20_data,family=poisson)
+```
+
+```{r}
+simOutput_cond2_17<-simulateResiduals(fittedModel=cond2_17,n=5000)
+simOutput_cond2_18<-simulateResiduals(fittedModel=cond2_18,n=5000)
+simOutput_cond2_20<-simulateResiduals(fittedModel=cond2_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond2_17)
+plot(simOutput_cond2_18)
+plot(simOutput_cond2_20)
+```
+
+Refit with negative binomial and zero inflation:
+
+```{r message=FALSE, warning=FALSE}
+cond2_17<-glmmTMB(n_seeds~med_h,ziformula=~1,family="nbinom2",ping_17_data)
+cond2_18<-glmmTMB(n_seeds~med_h,ziformula=~1,family="nbinom2",ping_18_data)
+cond2_20<-glmmTMB(n_seeds~med_h,ziformula=~1,family="nbinom2",ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond2_17<-simulateResiduals(fittedModel=cond2_17,n=5000)
+simOutput_cond2_18<-simulateResiduals(fittedModel=cond2_18,n=5000)
+simOutput_cond2_20<-simulateResiduals(fittedModel=cond2_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond2_17)
+plot(simOutput_cond2_18)
+plot(simOutput_cond2_20)
+```
+
+```{r}
+summary(cond2_17)
+summary(cond2_18)
+summary(cond2_20)
+```
+
+## Rosette area (log)
+
+```{r}
+cond3_17<-glm(n_seeds~log(ros_area),ping_17_data,family=poisson)
+cond3_18<-glm(n_seeds~log(ros_area),ping_18_data,family=poisson)
+cond3_20<-glm(n_seeds~log(ros_area),ping_20_data,family=poisson)
+```
+
+```{r}
+simOutput_cond3_17<-simulateResiduals(fittedModel=cond3_17,n=5000)
+simOutput_cond3_18<-simulateResiduals(fittedModel=cond3_18,n=5000)
+simOutput_cond3_20<-simulateResiduals(fittedModel=cond3_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond3_17)
+plot(simOutput_cond3_18)
+plot(simOutput_cond3_20)
+```
+
+```{r message=FALSE, warning=FALSE}
+cond3_17<-glmmTMB(n_seeds~log(ros_area),family="nbinom2",ping_17_data)
+cond3_18<-glmmTMB(n_seeds~log(ros_area),family="nbinom2",ping_18_data)
+cond3_20<-glmmTMB(n_seeds~log(ros_area),family="nbinom2",ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond3_17<-simulateResiduals(fittedModel=cond3_17,n=5000)
+simOutput_cond3_18<-simulateResiduals(fittedModel=cond3_18,n=5000)
+simOutput_cond3_20<-simulateResiduals(fittedModel=cond3_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond3_17)
+plot(simOutput_cond3_18)
+plot(simOutput_cond3_20)
+```
+
+```{r message=FALSE, warning=FALSE}
+cond3_17<-glmmTMB(n_seeds~log(ros_area),ziformula=~1,family="nbinom2",
+                  ping_17_data)
+cond3_18<-glmmTMB(n_seeds~log(ros_area),ziformula=~1,family="nbinom2",
+                  ping_18_data)
+cond3_20<-glmmTMB(n_seeds~log(ros_area),ziformula=~1,family="nbinom2",
+                  ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond3_17<-simulateResiduals(fittedModel=cond3_17,n=5000)
+simOutput_cond3_18<-simulateResiduals(fittedModel=cond3_18,n=5000)
+simOutput_cond3_20<-simulateResiduals(fittedModel=cond3_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond3_17)
+plot(simOutput_cond3_18)
+plot(simOutput_cond3_20)
+```
+
+```{r}
+summary(cond3_17)
+summary(cond3_18)
+summary(cond3_20)
+```
+
+## Total height (log)
+
+```{r}
+cond4_17<-glm(n_seeds~log(tot_h),ping_17_data,family=poisson)
+cond4_18<-glm(n_seeds~log(tot_h),ping_18_data,family=poisson)
+cond4_20<-glm(n_seeds~log(tot_h),ping_20_data,family=poisson)
+```
+
+```{r}
+simOutput_cond4_17<-simulateResiduals(fittedModel=cond4_17,n=5000)
+simOutput_cond4_18<-simulateResiduals(fittedModel=cond4_18,n=5000)
+simOutput_cond4_20<-simulateResiduals(fittedModel=cond4_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond4_17)
+plot(simOutput_cond4_18)
+plot(simOutput_cond4_20)
+```
+
+```{r message=FALSE, warning=FALSE}
+cond4_17<-glmmTMB(n_seeds~log(tot_h),ziformula=~1,family="nbinom2",
+                  ping_17_data)
+cond4_18<-glmmTMB(n_seeds~log(tot_h),ziformula=~1,family="nbinom2",
+                  ping_18_data)
+cond4_20<-glmmTMB(n_seeds~log(tot_h),ziformula=~1,family="nbinom2",
+                  ping_20_data)
+```
+
+```{r message=FALSE, warning=FALSE}
+simOutput_cond4_17<-simulateResiduals(fittedModel=cond4_17,n=5000)
+simOutput_cond4_18<-simulateResiduals(fittedModel=cond4_18,n=5000)
+simOutput_cond4_20<-simulateResiduals(fittedModel=cond4_20,n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_cond4_17)
+plot(simOutput_cond4_18)
+plot(simOutput_cond4_20)
+```
+
+```{r}
+summary(cond4_17)
+summary(cond4_18)
+summary(cond4_20)
+```
+
+Total height has larger effect sizes than rosette area in 2 out of 3 years (checked with models with scaled predictors). Use total height as condition variable.
+
 # 1. Effect of temperature on FFD
 
 ## Fit linear models
 
-Not including number of flowers as covariate, including quadratic effects of ffd.
+Including quadratic effects of temp.
 
 ```{r echo=TRUE}
 FFD_2017_1<-lm(FFD_corr~temp+I(temp^2),ping_17_data)
@@ -83,7 +444,7 @@ summ(FFD_2020_1,vif=T,scale=T) # scale=T reports standardized coefs
 
 Quadratic effects significant in 2018 and 2020, but not on 2017.
 
-Refit model for 2017 withouth quadratic term of ffd.
+Refit model for 2017 withouth quadratic term of temp.
 
 ```{r echo=TRUE}
 FFD_2017_2<-lm(FFD_corr~temp,ping_17_data)
@@ -128,20 +489,1456 @@ plot(simOutput_FFD_2018_1)
 plot(simOutput_FFD_2020_1)
 ```
 
+Looks OK.
 
+# 2. Effect of temperature on fitness
 
+## Fit linear models
 
+Including total height (log) as condition variable, including quadratic effects of temp.
 
+Using only plants from control treatment in 2020.
 
+```{r echo=TRUE}
+fitness_2017_1<-lm(n_seeds~temp+I(temp^2)+log(tot_h),ping_17_data)
+fitness_2018_1<-lm(n_seeds~temp+I(temp^2)+log(tot_h),ping_18_data)
+fitness_2020_1<-lm(n_seeds~temp+I(temp^2)+log(tot_h),
+                   subset(ping_20_data,treatment=="C"))
+```
 
+### Model diagnostics
 
+```{r}
+simOutput_fitness_2017_1<-simulateResiduals(fittedModel=fitness_2017_1,
+                                               n=5000)
+simOutput_fitness_2018_1<-simulateResiduals(fittedModel=fitness_2018_1,
+                                               n=5000)
+simOutput_fitness_2020_1<-simulateResiduals(fittedModel=fitness_2020_1,
+                                               n=5000)
+```
 
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_2017_1)
+plot(simOutput_fitness_2018_1)
+plot(simOutput_fitness_2020_1)
+```
+Looking not very good.
 
+## Fit Poisson GLMs
 
+```{r echo=TRUE}
+fitness_2017_1<-glm(n_seeds~temp+I(temp^2)+log(tot_h),ping_17_data,
+                    family="poisson")
+fitness_2018_1<-glm(n_seeds~temp+I(temp^2)+log(tot_h),ping_18_data,
+                    family="poisson")
+fitness_2020_1<-glm(n_seeds~temp+I(temp^2)+log(tot_h),
+                   subset(ping_20_data,treatment=="C"),family="poisson")
+```
 
+### Model diagnostics
 
+```{r}
+simOutput_fitness_2017_1<-simulateResiduals(fittedModel=fitness_2017_1,
+                                               n=5000)
+simOutput_fitness_2018_1<-simulateResiduals(fittedModel=fitness_2018_1,
+                                               n=5000)
+simOutput_fitness_2020_1<-simulateResiduals(fittedModel=fitness_2020_1,
+                                               n=5000)
+```
 
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_2017_1)
+plot(simOutput_fitness_2018_1)
+plot(simOutput_fitness_2020_1)
+```
 
+```{r}
+testDispersion(simOutput_fitness_2017_1)
+testDispersion(simOutput_fitness_2018_1)
+testDispersion(simOutput_fitness_2020_1)
+```
+
+There is overdispersion.
+
+## Fit negative binomial GLMs
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2017_1<-glmmTMB(n_seeds~temp+I(temp^2)+log(tot_h),ping_17_data,
+                    family="nbinom2")
+fitness_2018_1<-glmmTMB(n_seeds~temp+I(temp^2)+log(tot_h),ping_18_data,
+                    family="nbinom2")
+fitness_2020_1<-glmmTMB(n_seeds~temp+I(temp^2)+log(tot_h),
+                   subset(ping_20_data,treatment=="C"),family="nbinom2")
+```
+
+### Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+simOutput_fitness_2017_1<-simulateResiduals(fittedModel=fitness_2017_1,
+                                               n=5000)
+simOutput_fitness_2018_1<-simulateResiduals(fittedModel=fitness_2018_1,
+                                               n=5000)
+simOutput_fitness_2020_1<-simulateResiduals(fittedModel=fitness_2020_1,
+                                               n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_2017_1)
+plot(simOutput_fitness_2018_1)
+plot(simOutput_fitness_2020_1)
+```
+
+## Fit negative binomial GLMs with zero inflation
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2017_1<-glmmTMB(n_seeds~temp+I(temp^2)+log(tot_h),ziformula=~1,
+                        ping_17_data,family="nbinom2")
+fitness_2018_1<-glmmTMB(n_seeds~temp+I(temp^2)+log(tot_h),ziformula=~1,
+                        ping_18_data,family="nbinom2")
+fitness_2020_1<-glmmTMB(n_seeds~temp+I(temp^2)+log(tot_h),ziformula=~1,
+                        subset(ping_20_data,treatment=="C"),family="nbinom2")
+```
+
+### Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+simOutput_fitness_2017_1<-simulateResiduals(fittedModel=fitness_2017_1,
+                                               n=5000)
+simOutput_fitness_2018_1<-simulateResiduals(fittedModel=fitness_2018_1,
+                                               n=5000)
+simOutput_fitness_2020_1<-simulateResiduals(fittedModel=fitness_2020_1,
+                                               n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_2017_1)
+plot(simOutput_fitness_2018_1)
+plot(simOutput_fitness_2020_1)
+```
+
+Looking OK, use  negative binomial with zero inflation
+
+### Model summaries
+
+```{r}
+summary(fitness_2017_1)
+summary(fitness_2018_1)
+summary(fitness_2020_1)
+```
+
+Quadratic effects of temperature never significant.
+
+## Remove quadratic effects of temperature
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2017_1<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~1,
+                        ping_17_data,family="nbinom2")
+fitness_2018_1<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~1,
+                        ping_18_data,family="nbinom2")
+fitness_2020_1<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~1,
+                        subset(ping_20_data,treatment=="C"),family="nbinom2")
+```
+
+### Model summaries
+
+```{r}
+summary(fitness_2017_1)
+summary(fitness_2018_1)
+summary(fitness_2020_1)
+```
+
+Effect of temperature only significant in 2018.
+
+### Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+simOutput_fitness_2017_1<-simulateResiduals(fittedModel=fitness_2017_1,
+                                               n=5000)
+simOutput_fitness_2018_1<-simulateResiduals(fittedModel=fitness_2018_1,
+                                               n=5000)
+simOutput_fitness_2020_1<-simulateResiduals(fittedModel=fitness_2020_1,
+                                               n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_2017_1)
+plot(simOutput_fitness_2018_1)
+plot(simOutput_fitness_2020_1)
+```
+Still looking OK!
+
+### Model predictions
+
+```{r message=FALSE, warning=FALSE}
+plot(ggeffect(fitness_2017_1,type="zero_inflated"),add.data=T)
+plot(ggeffect(fitness_2018_1,type="zero_inflated"),
+     add.data=T) # * negative effect of temp
+plot(ggeffect(fitness_2020_1,type="zero_inflated"),add.data=T)
+```
+
+## Add variables in zi part of the models
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2017_2<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~.,
+                        ping_17_data,family="nbinom2")
+fitness_2018_2<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~.,
+                        ping_18_data,family="nbinom2")
+fitness_2020_2<-glmmTMB(n_seeds~temp+log(tot_h),ziformula=~.,
+                        subset(ping_20_data,treatment=="C"),family="nbinom2")
+```
+
+### Model summaries
+
+```{r}
+summary(fitness_2017_2)
+summary(fitness_2018_2)
+summary(fitness_2020_2)
+```
+
+Not significant in the zi part of the model.
+
+### Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+simOutput_fitness_2017_2<-simulateResiduals(fittedModel=fitness_2017_2,
+                                               n=5000)
+simOutput_fitness_2018_2<-simulateResiduals(fittedModel=fitness_2018_2,
+                                               n=5000)
+simOutput_fitness_2020_2<-simulateResiduals(fittedModel=fitness_2020_2,
+                                               n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_2017_2)
+plot(simOutput_fitness_2018_2)
+plot(simOutput_fitness_2020_2)
+```
+
+And still looking OK.
+
+# 3. Effect of temperature on fitness (0/1)
+
+```{r}
+nrow(subset(ping_17_data,n_seeds==0))/nrow(ping_17_data)
+nrow(subset(ping_18_data,n_seeds==0))/nrow(ping_18_data)
+nrow(subset(ping_20_data,n_seeds==0))/nrow(ping_20_data)
+```
+Around half of the plants produced no seeds. 
+
+Create 0/1 variable for fitness:
+
+```{r}
+ping_17_data$fitness_01<-with(ping_17_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+ping_18_data$fitness_01<-with(ping_18_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+ping_20_data$fitness_01<-with(ping_20_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+```
+
+## Fit binomial GLMs
+
+```{r}
+fitness_01_2017_1<-glm(fitness_01~temp+I(temp^2)+log(tot_h),ping_17_data,
+                       family="binomial")
+fitness_01_2018_1<-glm(fitness_01~temp+I(temp^2)+log(tot_h),ping_18_data,
+                       family="binomial")
+fitness_01_2020_1<-glm(fitness_01~temp+I(temp^2)+log(tot_h),
+                   subset(ping_20_data,treatment=="C"),family="binomial")
+```
+
+Quadratic effects not significant.
+
+Models without quadratic effects:
+
+```{r}
+fitness_01_2017_1<-glm(fitness_01~temp+log(tot_h),ping_17_data,
+                       family="binomial")
+fitness_01_2018_1<-glm(fitness_01~temp+log(tot_h),ping_18_data,
+                       family="binomial")
+fitness_01_2020_1<-glm(fitness_01~temp+log(tot_h),
+                   subset(ping_20_data,treatment=="C"),family="binomial")
+```
+
+```{r}
+summary(fitness_01_2017_1)
+summary(fitness_01_2018_1)
+summary(fitness_01_2020_1)
+```
+
+No significant effects.
+
+## Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+simOutput_fitness_01_2017_1<-simulateResiduals(fittedModel=fitness_01_2017_1,
+                                               n=5000)
+simOutput_fitness_01_2018_1<-simulateResiduals(fittedModel=fitness_01_2018_1,
+                                               n=5000)
+simOutput_fitness_01_2020_1<-simulateResiduals(fittedModel=fitness_01_2020_1,
+                                               n=5000)
+```
+
+```{r fig.height=4, fig.width=7}
+plot(simOutput_fitness_01_2017_1)
+plot(simOutput_fitness_01_2018_1)
+plot(simOutput_fitness_01_2020_1)
+```
+
+Looking OK.
+
+# 4. Effect of treatment on fitness (2020)
+
+## Fit negative binomial GLM with zero inflation
+
+Including total height (log) as condition variable.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2020_treat<-glmmTMB(n_seeds~treatment+log(tot_h),ziformula=~1,
+                            ping_20_data,family="nbinom2")
+```
+
+## Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+plot(simulateResiduals(fittedModel=fitness_2020_treat,n=5000))
+```
+
+## Model summary and predictions
+
+```{r}
+summary(fitness_2020_treat)
+```
+
+```{r message=FALSE, warning=FALSE}
+plot(ggeffect(fitness_2020_treat))
+```
+
+Fitness significantly larger in pollination treatment than in control.
+
+## Add variables to zi part of the model
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2020_treat_2<-glmmTMB(n_seeds~treatment+log(tot_h),ziformula=~.,
+                            ping_20_data,family="nbinom2")
+summary(fitness_2020_treat_2)
+```
+
+Similar.
+
+# 5. Effect of treatment on fitness (0/1) (2020)
+
+## Fit binomial GLM
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_01_2020_treat<-glm(fitness_01~treatment+log(tot_h),ping_20_data,
+                           family="binomial")
+```
+
+```{r}
+summary(fitness_01_2020_treat)
+```
+
+No significant effects.
+
+## Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+plot(simulateResiduals(fittedModel=fitness_01_2020_treat,n=5000))
+```
+
+# 6. Effect of temperature AND treatment on fitness (2020)
+
+## Fit negative binomial GLM with zero inflation
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2020_temp_treat<-glmmTMB(n_seeds~temp*treatment+log(tot_h),ziformula=~1,
+                            ping_20_data,family="nbinom2")
+```
+
+```{r}
+summary(fitness_2020_temp_treat)
+```
+
+```{r}
+plot(ggpredict(fitness_2020_temp_treat,terms=c("temp","treatment"),
+               type="fixed"))
+```
+
+Fitness decreases with temperature only for plants in F treatment. This seems contrary to my expectations!
+
+## Model diagnostics
+
+```{r message=FALSE, warning=FALSE}
+plot(simulateResiduals(fittedModel=fitness_2020_temp_treat,n=5000))
+```
+
+## Add variables to zi part of the model
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_2020_temp_treat_2<-glmmTMB(n_seeds~temp*treatment+log(tot_h),
+                                   ziformula=~.,ping_20_data,family="nbinom2")
+summary(fitness_2020_temp_treat_2)
+```
+
+```{r message=FALSE, warning=FALSE}
+plot(ggpredict(fitness_2020_temp_treat_2,terms=c("temp","treatment"),
+               type="fixed"))
+plot(ggpredict(fitness_2020_temp_treat_2,terms=c("temp","treatment"),
+               type="zi_prob"))
+```
+
+First plot similar to before. In second plot, the probability of zero inflation is represented: values of 1 in the Y-axis indicate a 100% probability of zero inflation (i.e. of producing 0 seeds), so it is like an "inversed" binomial model. 
+
+The probability of zero inflation decreases with temperature for plants in the PF treatment (and almost in the F treatment, p=0.07).In other words, the probability of producing seeds increases with temperature in those treatments. This agrees with my expectations, as pollination and prey supplementation might partly compensate for the maladaptive nature of plasticity on heated soils, "restoring" interactions that might be lost in these areas because of different sensitivities to warming between plants and interacting animals. 
+
+# 7. Effect of temperature AND treatment on fitness (0/1) (2020)
+
+## Fit binomial GLM
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fitness_01_2020_temp_treat<-glm(fitness_01~temp*treatment+log(tot_h),
+                                ping_20_data,family="binomial")
+```
+
+```{r}
+summary(fitness_01_2020_temp_treat)
+```
+
+```{r}
+plot(ggpredict(fitness_01_2020_temp_treat,terms=c("temp","treatment")))
+```
+
+The probability of producing seeds increases with temperature for plants in the PF treatment (and almost in the F treatment, p=0.07). This agrees with the results of the previous zero-inflated model and with my expectations. 
+
+Relationship among fitness_01 and temp for the different treatments:
+
+```{r}
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="C"),
+            family="binomial"))
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="P"),
+            family="binomial"))
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="F"),
+            family="binomial"))
+summary(glm(fitness_01~temp+log(tot_h),subset(ping_20_data,treatment=="PF"),
+            family="binomial")) # +*
+```
+
+# 8. Effect of temperature on selection on FFD
+
+## Standardize traits and relativize fitness
+
+```{r}
+# Standardize FFD
+ping_17_data$FFD_corr_std<-as.numeric(scale(ping_17_data$FFD_corr))
+ping_18_data$FFD_corr_std<-as.numeric(scale(ping_18_data$FFD_corr))
+ping_20_data$FFD_corr_std<-as.numeric(scale(ping_20_data$FFD_corr))
+# Standardize total height (first log, then scale)
+ping_17_data$tot_h_std<-as.numeric(scale(log(ping_17_data$tot_h)))
+ping_18_data$tot_h_std<-as.numeric(scale(log(ping_18_data$tot_h)))
+ping_20_data$tot_h_std<-as.numeric(scale(log(ping_20_data$tot_h)))
+# Relativize fitness
+ping_17_data$n_seeds_rel<-with(ping_17_data,n_seeds/mean(n_seeds,na.rm=T))
+ping_18_data$n_seeds_rel<-with(ping_18_data,n_seeds/mean(n_seeds,na.rm=T))
+ping_20_data$n_seeds_rel<-with(ping_20_data,n_seeds/mean(n_seeds,na.rm=T))
+# ping_20_data, treament C
+ping_20_data_C<-subset(ping_20_data,treatment=="C")%>%
+  mutate(FFD_corr_std=as.numeric(scale(FFD_corr)),
+         tot_h_std=as.numeric(scale(log(tot_h))),
+         n_seeds_rel=n_seeds/mean(n_seeds,na.rm=T))
+```
+
+## Fit linear models
+
+```{r}
+selection_2017_1<-lm(n_seeds_rel~FFD_corr_std*temp+FFD_corr_std*I(temp^2)+
+                       tot_h_std,ping_17_data)
+selection_2018_1<-lm(n_seeds_rel~FFD_corr_std*temp+FFD_corr_std*I(temp^2)+
+                       tot_h_std,ping_18_data)
+selection_2020_1<-lm(n_seeds_rel~FFD_corr_std*temp+FFD_corr_std*I(temp^2)+
+                       tot_h_std,ping_20_data) 
+selection_2020_C_1<-lm(n_seeds_rel~FFD_corr_std*temp+FFD_corr_std*I(temp^2)+
+                       tot_h_std,ping_20_data_C) 
+```
+
+```{r}
+summary(selection_2017_1)
+summary(selection_2018_1)
+summary(selection_2020_1) # * int temp:FFD
+summary(selection_2020_C_1) # int NS
+```
+
+Quadratic terms never significant. Refit models withouth quadratic terms.
+
+```{r}
+selection_2017_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                     subset(ping_17_data,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std)))
+selection_2018_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                     subset(ping_18_data,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std)))
+selection_2020_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                     subset(ping_20_data,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std))) 
+selection_2020_C_1<-lm(n_seeds_rel~FFD_corr_std*temp+tot_h_std,
+                       subset(ping_20_data_C,
+                            !is.na(n_seeds_rel)&!is.na(tot_h_std))) 
+```
+
+```{r}
+summary(selection_2017_1)
+summary(selection_2018_1) # *- temp
+summary(selection_2020_1) # * int temp:FFD
+summary(selection_2020_C_1) # int temp:FFD, p=0.0562
+```
+
+## Model predictions
+
+```{r}
+plot(ggpredict(selection_2018_1,terms=c("temp"))) # *- temp
+plot(ggpredict(selection_2020_1,
+               terms=c("FFD_corr_std","temp"))) # * int temp:FFD
+plot(ggpredict(selection_2020_C_1,
+               terms=c("FFD_corr_std","temp"))) # int temp:FFD, p=0.0562
+```
+
+2018: higher fitness in colder soils.
+2020: early flowering relatively more favoured in colder soils (similar to result for Cerastium but it seems that there is no selection on FFD in warmer soils here - if we look only at plants in the C treatment - p=0.0562).
+
+## Model diagnostics
+
+```{r}
+plot(simulateResiduals(fittedModel=selection_2017_1,n=5000))
+plot(simulateResiduals(fittedModel=selection_2018_1,n=5000))
+plot(simulateResiduals(fittedModel=selection_2020_1,n=5000))
+plot(simulateResiduals(fittedModel=selection_2020_C_1,n=5000))
+```
+
+Looking bad but not awful, especially for selection_2020_C_1. Anyway, calculate BCA intervals.
+
+## BCA intervals
+
+### selection_2017_1
+
+```{r eval=FALSE, include=FALSE}
+# FFD_corr_std
+slp <- function(selection_2017_1) coef(selection_2017_1)[2]
+b <- car::Boot(selection_2017_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp
+slp <- function(selection_2017_1) coef(selection_2017_1)[3]
+b <- car::Boot(selection_2017_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2017_1) coef(selection_2017_1)[4]
+b <- car::Boot(selection_2017_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:temp
+slp <- function(selection_2017_1) coef(selection_2017_1)[5]
+b <- car::Boot(selection_2017_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2017_1 <- cbind(
+  rbind(FFD_corr_std_ci[1,] ,temp_ci[1,], tot_h_std_ci[1,],
+        FFD_corr_std_temp_ci[1,]),
+  rbind(FFD_corr_std_ci[2,] ,temp_ci[2,], tot_h_std_ci[2,],
+        FFD_corr_std_temp_ci[2,])
+)
+colnames(BCIs_selection_2017_1)<-c("lower","upper")
+rownames(BCIs_selection_2017_1) <- c("FFD_corr_std","temp","tot_h_std",
+                                     "FFD_corr_std_temp")
+save(BCIs_selection_2017_1,file="output/BCIs_selection_2017_1.RData")
+```
+
+```{r}
+BCIs_selection_2017_1
+```
+
+Similar to significances in the model, only CIs for tot_h_std not enclosing zero.
+
+### selection_2018_1
+
+```{r eval=FALSE, include=FALSE}
+# FFD_corr_std
+slp <- function(selection_2018_1) coef(selection_2018_1)[2]
+b <- car::Boot(selection_2018_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp
+slp <- function(selection_2018_1) coef(selection_2018_1)[3]
+b <- car::Boot(selection_2018_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2018_1) coef(selection_2018_1)[4]
+b <- car::Boot(selection_2018_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:temp
+slp <- function(selection_2018_1) coef(selection_2018_1)[5]
+b <- car::Boot(selection_2018_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2018_1 <- cbind(
+  rbind(FFD_corr_std_ci[1,] ,temp_ci[1,], tot_h_std_ci[1,],
+        FFD_corr_std_temp_ci[1,]),
+  rbind(FFD_corr_std_ci[2,] ,temp_ci[2,], tot_h_std_ci[2,],
+        FFD_corr_std_temp_ci[2,])
+)
+colnames(BCIs_selection_2018_1)<-c("lower","upper")
+rownames(BCIs_selection_2018_1) <- c("FFD_corr_std","temp","tot_h_std",
+                                     "FFD_corr_std_temp")
+save(BCIs_selection_2018_1,file="output/BCIs_selection_2018_1.RData")
+```
+
+```{r}
+BCIs_selection_2018_1
+```
+
+Similar to significances in the model, CIs for temp and tot_h_std not enclosing zero.
+
+### selection_2020_1
+
+```{r eval=FALSE, include=FALSE}
+# FFD_corr_std
+slp <- function(selection_2020_1) coef(selection_2020_1)[2]
+b <- car::Boot(selection_2020_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp
+slp <- function(selection_2020_1) coef(selection_2020_1)[3]
+b <- car::Boot(selection_2020_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_1) coef(selection_2020_1)[4]
+b <- car::Boot(selection_2020_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:temp
+slp <- function(selection_2020_1) coef(selection_2020_1)[5]
+b <- car::Boot(selection_2020_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_1 <- cbind(
+  rbind(FFD_corr_std_ci[1,] ,temp_ci[1,], tot_h_std_ci[1,],
+        FFD_corr_std_temp_ci[1,]),
+  rbind(FFD_corr_std_ci[2,] ,temp_ci[2,], tot_h_std_ci[2,],
+        FFD_corr_std_temp_ci[2,])
+)
+colnames(BCIs_selection_2020_1)<-c("lower","upper")
+rownames(BCIs_selection_2020_1) <- c("FFD_corr_std","temp","tot_h_std",
+                                     "FFD_corr_std_temp")
+save(BCIs_selection_2020_1,file="output/BCIs_selection_2020_1.RData")
+```
+
+```{r}
+BCIs_selection_2020_1
+```
+
+Similar to significances in the model, CIs for FFD_corr_std, tot_h_std and FFD_corr_std:temp not enclosing zero.
+
+### selection_2020_C_1
+
+```{r eval=FALSE, include=FALSE}
+# FFD_corr_std
+slp <- function(selection_2020_C_1) coef(selection_2020_C_1)[2]
+b <- car::Boot(selection_2020_C_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp
+slp <- function(selection_2020_C_1) coef(selection_2020_C_1)[3]
+b <- car::Boot(selection_2020_C_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_C_1) coef(selection_2020_C_1)[4]
+b <- car::Boot(selection_2020_C_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:temp
+slp <- function(selection_2020_C_1) coef(selection_2020_C_1)[5]
+b <- car::Boot(selection_2020_C_1,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_C_1 <- cbind(
+  rbind(FFD_corr_std_ci[1,] ,temp_ci[1,], tot_h_std_ci[1,],
+        FFD_corr_std_temp_ci[1,]),
+  rbind(FFD_corr_std_ci[2,] ,temp_ci[2,], tot_h_std_ci[2,],
+        FFD_corr_std_temp_ci[2,])
+)
+colnames(BCIs_selection_2020_C_1)<-c("lower","upper")
+rownames(BCIs_selection_2020_C_1) <- c("FFD_corr_std","temp","tot_h_std",
+                                     "FFD_corr_std_temp")
+save(BCIs_selection_2020_C_1,file="output/BCIs_selection_2020_C_1.RData")
+```
+
+```{r}
+BCIs_selection_2020_C_1
+```
+
+Different to significances in the model! CIs for FFD_corr_std (also * in model) and FFD_corr_std:temp not enclosing zero (p=0.0562 in model).
+
+# 9. Effect of treatment on selection on FFD (2020)
+
+## Fit linear model
+
+```{r}
+selection_2020_2<-lm(n_seeds_rel~FFD_corr_std*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+```
+
+```{r}
+summary(selection_2020_2)
+```
+
+No significant effects (only tot_h_std).
+
+## Model diagnostics
+
+```{r}
+plot(simulateResiduals(fittedModel=selection_2020_2,n=5000))
+```
+
+## BCA intervals
+
+```{r eval=FALSE, include=FALSE}
+# FFD_corr_std
+slp <- function(selection_2020_2) coef(selection_2020_2)[2]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentF
+slp <- function(selection_2020_2) coef(selection_2020_2)[3]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentP
+slp <- function(selection_2020_2) coef(selection_2020_2)[4]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentPF
+slp <- function(selection_2020_2) coef(selection_2020_2)[5]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_2) coef(selection_2020_2)[6]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentF
+slp <- function(selection_2020_2) coef(selection_2020_2)[7]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentP
+slp <- function(selection_2020_2) coef(selection_2020_2)[8]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentPF
+slp <- function(selection_2020_2) coef(selection_2020_2)[9]
+b <- car::Boot(selection_2020_2,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_2 <- cbind(rbind(FFD_corr_std_ci[1,] ,treatmentF_ci[1,],
+                                     treatmentP_ci[1,], treatmentPF_ci[1,],
+                                     tot_h_std_ci[1,],
+                                     FFD_corr_std_treatmentF_ci[1,],
+                                     FFD_corr_std_treatmentP_ci[1,],
+                                     FFD_corr_std_treatmentPF_ci[1,]),
+                               rbind(FFD_corr_std_ci[2,] ,treatmentF_ci[2,],
+                                     treatmentP_ci[2,], treatmentPF_ci[2,],
+                                     tot_h_std_ci[2,],
+                                     FFD_corr_std_treatmentF_ci[2,],
+                                     FFD_corr_std_treatmentP_ci[2,],
+                                     FFD_corr_std_treatmentPF_ci[2,]))
+colnames(BCIs_selection_2020_2)<-c("lower","upper")
+rownames(BCIs_selection_2020_2) <- c("FFD_corr_std","treatmentF",
+                                     "treatmentP","treatmentPF",
+                           "tot_h","FFD_corr_std:treatmentF",
+                           "FFD_corr_std:treatmentP",
+                           "FFD_corr_std:treatmentPF")
+save(BCIs_selection_2020_2,file="output/BCIs_selection_2020_2.RData")
+```
+
+```{r}
+BCIs_selection_2020_2
+```
+
+Similar to significances in the model, only CIs for tot_h_std not enclosing zero.
+
+# 10. Effect of temperature*FFD and temperature*treatment (2020)
+
+## Fit linear model
+
+```{r}
+selection_2020_3<-lm(n_seeds_rel~temp*FFD_corr_std+temp*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+```
+
+```{r}
+summary(selection_2020_3)
+```
+
+temp:FFD_corr_std*
+
+## Model diagnostics
+
+```{r}
+plot(simulateResiduals(fittedModel=selection_2020_3,n=5000))
+```
+
+## BCA intervals
+
+```{r eval=FALSE, include=FALSE}
+# temp
+slp <- function(selection_2020_3) coef(selection_2020_3)[2]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std
+slp <- function(selection_2020_3) coef(selection_2020_3)[3]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentF
+slp <- function(selection_2020_3) coef(selection_2020_3)[4]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentP
+slp <- function(selection_2020_3) coef(selection_2020_3)[5]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentPF
+slp <- function(selection_2020_3) coef(selection_2020_3)[6]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_3) coef(selection_2020_3)[7]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std
+slp <- function(selection_2020_3) coef(selection_2020_3)[8]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentF
+slp <- function(selection_2020_3) coef(selection_2020_3)[9]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentP
+slp <- function(selection_2020_3) coef(selection_2020_3)[10]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentPF
+slp <- function(selection_2020_3) coef(selection_2020_3)[11]
+b <- car::Boot(selection_2020_3,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_3 <- cbind(rbind(temp_ci[1,],FFD_corr_std_ci[1,] ,
+                                     treatmentF_ci[1,],
+                                     treatmentP_ci[1,], treatmentPF_ci[1,],
+                                     tot_h_std_ci[1,],temp_FFD_corr_std_ci[1,],
+                                     temp_treatmentF_ci[1,],
+                                     temp_treatmentP_ci[1,],
+                                     temp_treatmentPF_ci[1,]),
+                               rbind(temp_ci[2,],FFD_corr_std_ci[2,] ,
+                                     treatmentF_ci[2,],
+                                     treatmentP_ci[2,], treatmentPF_ci[2,],
+                                     tot_h_std_ci[2,],temp_FFD_corr_std_ci[2,],
+                                     temp_treatmentF_ci[2,],
+                                     temp_treatmentP_ci[2,],
+                                     temp_treatmentPF_ci[2,]))
+colnames(BCIs_selection_2020_3)<-c("lower","upper")
+rownames(BCIs_selection_2020_3) <- c("temp","FFD_corr_std","treatmentF",
+                                     "treatmentP","treatmentPF","tot_h",
+                                     "temp:FFD_corr_std",
+                                     "temp:treatmentF","temp:treatmentP",
+                                     "temp:treatmentPF")
+save(BCIs_selection_2020_3,file="output/BCIs_selection_2020_3.RData")
+```
+
+```{r}
+BCIs_selection_2020_3
+```
+
+Similar to significances in the model.
+
+# 11. Effect of temperature*FFD and treatment*FFD (2020)
+
+## Fit linear model
+
+```{r}
+selection_2020_4<-lm(n_seeds_rel~temp*FFD_corr_std+treatment*FFD_corr_std+
+                       tot_h_std,subset(ping_20_data,
+                                        !is.na(n_seeds_rel)&!is.na(tot_h_std)))
+```
+
+```{r}
+summary(selection_2020_4)
+```
+
+temp:FFD_corr_std*
+
+## Model diagnostics
+
+```{r}
+plot(simulateResiduals(fittedModel=selection_2020_4,n=5000))
+```
+
+## BCA intervals
+
+```{r eval=FALSE, include=FALSE}
+# temp
+slp <- function(selection_2020_4) coef(selection_2020_4)[2]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std
+slp <- function(selection_2020_4) coef(selection_2020_4)[3]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentF
+slp <- function(selection_2020_4) coef(selection_2020_4)[4]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentP
+slp <- function(selection_2020_4) coef(selection_2020_4)[5]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentPF
+slp <- function(selection_2020_4) coef(selection_2020_4)[6]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_4) coef(selection_2020_4)[7]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std
+slp <- function(selection_2020_4) coef(selection_2020_4)[8]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentF
+slp <- function(selection_2020_4) coef(selection_2020_4)[9]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentP
+slp <- function(selection_2020_4) coef(selection_2020_4)[10]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentPF
+slp <- function(selection_2020_4) coef(selection_2020_4)[11]
+b <- car::Boot(selection_2020_4,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_4 <- cbind(rbind(temp_ci[1,],FFD_corr_std_ci[1,] ,
+                                     treatmentF_ci[1,],
+                                     treatmentP_ci[1,], treatmentPF_ci[1,],
+                                     tot_h_std_ci[1,],temp_FFD_corr_std_ci[1,],
+                                     FFD_corr_std_treatmentF_ci[1,],
+                                     FFD_corr_std_treatmentP_ci[1,],
+                                     FFD_corr_std_treatmentPF_ci[1,]),
+                               rbind(temp_ci[2,],FFD_corr_std_ci[2,] ,
+                                     treatmentF_ci[2,],
+                                     treatmentP_ci[2,], treatmentPF_ci[2,],
+                                     tot_h_std_ci[2,],temp_FFD_corr_std_ci[2,],
+                                     FFD_corr_std_treatmentF_ci[2,],
+                                     FFD_corr_std_treatmentP_ci[2,],
+                                     FFD_corr_std_treatmentPF_ci[2,]))
+colnames(BCIs_selection_2020_4)<-c("lower","upper")
+rownames(BCIs_selection_2020_4) <- c("temp","FFD_corr_std","treatmentF",
+                                     "treatmentP","treatmentPF","tot_h",
+                                     "temp:FFD_corr_std",
+                                     "FFD_corr_std:treatmentF",
+                                     "FFD_corr_std:treatmentP",
+                                     "FFD_corr_std:treatmentPF")
+save(BCIs_selection_2020_4,file="output/BCIs_selection_2020_4.RData")
+```
+
+```{r}
+BCIs_selection_2020_4
+```
+
+Similar to significances in the model, but CIs for temp:treatmentPF not including zero.
+
+# 12. Effect of temperature*FFD, treatment*FFD and temperature*treatment (2020)
+
+## Fit linear model
+
+```{r}
+selection_2020_5<-lm(n_seeds_rel~temp*FFD_corr_std+treatment*FFD_corr_std+
+                       temp*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+```
+
+```{r}
+summary(selection_2020_5)
+```
+
+temp:FFD_corr_std*, temp:treatmentPF p=0.052263.
+
+## Model predictions
+
+```{r}
+plot(ggpredict(selection_2020_5,terms=c("FFD_corr_std","temp")))
+plot(ggpredict(selection_2020_5,terms=c("temp","treatment"))) 
+# temp:treatmentPF BCA intervals not enclosing zero
+```
+
+## Model diagnostics
+
+```{r}
+plot(simulateResiduals(fittedModel=selection_2020_5,n=5000))
+```
+
+## BCA intervals
+
+```{r eval=FALSE, include=FALSE}
+# temp
+slp <- function(selection_2020_5) coef(selection_2020_5)[2]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std
+slp <- function(selection_2020_5) coef(selection_2020_5)[3]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentF
+slp <- function(selection_2020_5) coef(selection_2020_5)[4]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentP
+slp <- function(selection_2020_5) coef(selection_2020_5)[5]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentPF
+slp <- function(selection_2020_5) coef(selection_2020_5)[6]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_5) coef(selection_2020_5)[7]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std
+slp <- function(selection_2020_5) coef(selection_2020_5)[8]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentF
+slp <- function(selection_2020_5) coef(selection_2020_5)[9]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentP
+slp <- function(selection_2020_5) coef(selection_2020_5)[10]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentPF
+slp <- function(selection_2020_5) coef(selection_2020_5)[11]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentF
+slp <- function(selection_2020_5) coef(selection_2020_5)[12]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentP
+slp <- function(selection_2020_5) coef(selection_2020_5)[13]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentPF
+slp <- function(selection_2020_5) coef(selection_2020_5)[14]
+b <- car::Boot(selection_2020_5,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_5 <- cbind(rbind(temp_ci[1,],FFD_corr_std_ci[1,] ,
+                                     treatmentF_ci[1,],
+                                     treatmentP_ci[1,], treatmentPF_ci[1,],
+                                     tot_h_std_ci[1,],temp_FFD_corr_std_ci[1,],
+                                     FFD_corr_std_treatmentF_ci[1,],
+                                     FFD_corr_std_treatmentP_ci[1,],
+                                     FFD_corr_std_treatmentPF_ci[1,],
+                                     temp_treatmentF_ci[1,],
+                                     temp_treatmentP_ci[1,],
+                                     temp_treatmentPF_ci[1,]),
+                               rbind(temp_ci[2,],FFD_corr_std_ci[2,] ,
+                                     treatmentF_ci[2,],
+                                     treatmentP_ci[2,], treatmentPF_ci[2,],
+                                     tot_h_std_ci[2,],temp_FFD_corr_std_ci[2,],
+                                     FFD_corr_std_treatmentF_ci[2,],
+                                     FFD_corr_std_treatmentP_ci[2,],
+                                     FFD_corr_std_treatmentPF_ci[2,],
+                                     temp_treatmentF_ci[2,],
+                                     temp_treatmentP_ci[2,],
+                                     temp_treatmentPF_ci[2,]))
+colnames(BCIs_selection_2020_5)<-c("lower","upper")
+rownames(BCIs_selection_2020_5) <- c("temp","FFD_corr_std","treatmentF",
+                                     "treatmentP","treatmentPF","tot_h",
+                                     "temp:FFD_corr_std",
+                                     "FFD_corr_std:treatmentF",
+                                     "FFD_corr_std:treatmentP",
+                                     "FFD_corr_std:treatmentPF",
+                                     "temp:treatmentF","temp:treatmentP",
+                                     "temp:treatmentPF")
+save(BCIs_selection_2020_5,file="output/BCIs_selection_2020_5.RData")
+```
+
+```{r}
+BCIs_selection_2020_5
+```
+
+Similar to significances in the model, but CIS for temp:treatmentPF do not enclose zero.
+
+# 13. Effect 3-way interaction temperature*FFD**treatment (2020)
+
+## Fit linear model
+
+```{r}
+selection_2020_6<-lm(n_seeds_rel~temp*FFD_corr_std*treatment+tot_h_std,
+                     subset(ping_20_data,!is.na(n_seeds_rel)&!is.na(tot_h_std)))
+```
+
+```{r}
+summary(selection_2020_6)
+```
+
+## Model predictions
+
+```{r}
+plot(ggpredict(selection_2020_6,terms=c("temp","FFD_corr_std")))
+# temp:FFD_corr_std CIs not enclosig zero
+plot(ggpredict(selection_2020_6,terms=c("temp","treatment")))
+# Only temp:treatmentPF CIs not enclosing zero
+# Below, two different representations of the same 3-way interaction
+plot(ggpredict(selection_2020_6,terms=c("FFD_corr_std","treatment","temp")))
+plot(ggpredict(selection_2020_6,terms=c("FFD_corr_std","temp","treatment")))
+# Only temp:FFD_corr_std:treatmentP CIs not including zero
+```
+
+At low temperatures, it is always better to flower early. At medium and high temperatures, it is better to flower early for plants in the C and F treatments, but better to flower late for plants in the P and PF treatments (only temp*FFD*treatmentP is significantly different from control).
+
+In other words, for plants in C and F treatments, it is always better to flower early, irrespective of soil temperature. For plants in P and PF treatments, it is better to flower early at cold soil temperatures, but late at warm soil temperatures. 
+
+## Model diagnostics
+
+```{r}
+plot(simulateResiduals(fittedModel=selection_2020_6,n=5000))
+```
+
+## BCA intervals
+
+```{r eval=FALSE, include=FALSE}
+# temp
+slp <- function(selection_2020_6) coef(selection_2020_6)[2]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std
+slp <- function(selection_2020_6) coef(selection_2020_6)[3]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentF
+slp <- function(selection_2020_6) coef(selection_2020_6)[4]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentP
+slp <- function(selection_2020_6) coef(selection_2020_6)[5]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# treatmentPF
+slp <- function(selection_2020_6) coef(selection_2020_6)[6]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# tot_h_std 
+slp <- function(selection_2020_6) coef(selection_2020_6)[7]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+tot_h_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std
+slp <- function(selection_2020_6) coef(selection_2020_6)[8]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentF
+slp <- function(selection_2020_6) coef(selection_2020_6)[9]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentP
+slp <- function(selection_2020_6) coef(selection_2020_6)[10]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:treatmentPF
+slp <- function(selection_2020_6) coef(selection_2020_6)[11]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentF
+slp <- function(selection_2020_6) coef(selection_2020_6)[12]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentP
+slp <- function(selection_2020_6) coef(selection_2020_6)[13]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# FFD_corr_std:treatmentPF
+slp <- function(selection_2020_6) coef(selection_2020_6)[14]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+FFD_corr_std_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std:treatmentF
+slp <- function(selection_2020_6) coef(selection_2020_6)[15]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_treatmentF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std:treatmentP
+slp <- function(selection_2020_6) coef(selection_2020_6)[16]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_treatmentP_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# temp:FFD_corr_std:treatmentPF
+slp <- function(selection_2020_6) coef(selection_2020_6)[17]
+b <- car::Boot(selection_2020_6,slp, R=10000) # note the capital B
+b1 <- boot::boot.ci(b,type="bca")
+temp_FFD_corr_std_treatmentPF_ci <- as.data.frame(b1$bca[1,4:5])
+rm(slp, b, b1)
+
+# Save confidence intervals as a table
+BCIs_selection_2020_6 <- cbind(rbind(temp_ci[1,],FFD_corr_std_ci[1,] ,
+                                     treatmentF_ci[1,],
+                                     treatmentP_ci[1,], treatmentPF_ci[1,],
+                                     tot_h_std_ci[1,],temp_FFD_corr_std_ci[1,],
+                                     temp_treatmentF_ci[1,],
+                                     temp_treatmentP_ci[1,],
+                                     temp_treatmentPF_ci[1,],
+                                     FFD_corr_std_treatmentF_ci[1,],
+                                     FFD_corr_std_treatmentP_ci[1,],
+                                     FFD_corr_std_treatmentPF_ci[1,],
+                                     temp_FFD_corr_std_treatmentF_ci[1,],
+                                     temp_FFD_corr_std_treatmentP_ci[1,],
+                                     temp_FFD_corr_std_treatmentPF_ci[1,]),
+                               rbind(temp_ci[2,],FFD_corr_std_ci[2,],
+                                     treatmentF_ci[2,],
+                                     treatmentP_ci[2,], treatmentPF_ci[2,],
+                                     tot_h_std_ci[2,],temp_FFD_corr_std_ci[2,],
+                                     temp_treatmentF_ci[2,],
+                                     temp_treatmentP_ci[2,],
+                                     temp_treatmentPF_ci[2,],
+                                     FFD_corr_std_treatmentF_ci[2,],
+                                     FFD_corr_std_treatmentP_ci[2,],
+                                     FFD_corr_std_treatmentPF_ci[2,],
+                                     temp_FFD_corr_std_treatmentF_ci[2,],
+                                     temp_FFD_corr_std_treatmentP_ci[2,],
+                                     temp_FFD_corr_std_treatmentPF_ci[2,]))
+colnames(BCIs_selection_2020_6)<-c("lower","upper")
+rownames(BCIs_selection_2020_6) <- c("temp","FFD_corr_std","treatmentF",
+                                     "treatmentP","treatmentPF","tot_h",
+                                     "temp:FFD_corr_std",
+                                     "temp:treatmentF","temp:treatmentP",
+                                     "temp:treatmentPF",
+                                     "FFD_corr_std:treatmentF",
+                                     "FFD_corr_std:treatmentP",
+                                     "FFD_corr_std:treatmentPF",
+                                     "temp:FFD_corr_std:treatmentF",
+                                     "temp:FFD_corr_std:treatmentP",
+                                     "temp:FFD_corr_std:treatmentPF")
+save(BCIs_selection_2020_6,file="output/BCIs_selection_2020_6.RData")
+```
+
+```{r}
+BCIs_selection_2020_6
+```
+
+Differences with significances in model: treatmentP CIs enclosing zero, temp:FFD_corr_std CIs not enclosing zero, temp:treatmentP CIs enclosing zero.
+
+# Session info
 
 ```{r}
 sessionInfo()

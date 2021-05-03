@@ -79,7 +79,7 @@ ping_17 <- ping_17 %>% mutate(plot=as.factor(Plot),id=Indv,
                               stage5=Stage...17,
                               date6=as.Date(Date...18,format="%d.%m.%y"),
                               stage6=Stage...19) %>%
-  select(-(Plot:Stage...19))
+  dplyr::select(-(Plot:Stage...19))
 ```
 
 ```{r}
@@ -105,7 +105,7 @@ ping_18 <- ping_18 %>% mutate(plot=as.factor(Plot),id=Indv,
                               stage8=Stage...23,
                               date9=as.Date(Date...24,format="%d.%m.%y"),
                               temp2=as.numeric(Temp...25)) %>%
-  select(-(Plot:Temp...25)) %>%
+  dplyr::select(-(Plot:Temp...25)) %>%
   filter(stage1!="X"&stage2!="X") %>% # Removing rows with all stages as "X"
   mutate(temp1=ifelse(temp1>80,8.7,temp1)) # Correct error in temp1
 # Temperature measured two times, at the beginning and end of the season
@@ -114,8 +114,8 @@ ping_18 <- ping_18 %>%
   mutate(temp=ifelse(is.na(temp1),temp2, # usetemp2 when temp1 is NA
                      ifelse(is.na(temp2),temp1, # use temp1 when temp2 is NA
                             (temp1+temp2)/2))) %>% # otherwise use mean
-  select(-temp1) %>% # Remove columns
-  select(-(date9:temp2))
+  dplyr::select(-temp1) %>% # Remove columns
+  dplyr::select(-(date9:temp2))
 ```
 
 ```{r}
@@ -142,14 +142,14 @@ ping_20 <- ping_20 %>%
          date12=as.Date(`Weel 14`,format="%d/%m/%y"),stage12=Stage...35,
          date13=as.Date(`Week 15`,format="%d/%m/%y"),stage13=Stage...37,
          date14=as.Date(`Week 16`,format="%d.%m.%y"),stage14=Stage...39) %>%
-  select(-(Plot:Stage...39)) %>%
+  dplyr::select(-(Plot:Stage...39)) %>%
   mutate(temp=ifelse(is.na(temp2)&is.na(temp3),temp1,
                      ifelse(is.na(temp1),(temp2+temp3)/2,
                             ifelse(is.na(temp2),(temp1+temp3)/2,
                                    (temp1+temp2)/2)))) %>% 
-  select(-temp1) %>% # Remove columns
-  select(-temp2) %>%
-  select(-temp3) %>%
+  dplyr::select(-temp1) %>% # Remove columns
+  dplyr::select(-temp2) %>%
+  dplyr::select(-temp3) %>%
   # Two plants that have peak=1, but in reality peak=0
   mutate(peak=ifelse(id=="P-224"|id=="P-225",0,peak)) %>%
   mutate(peak=as.factor(peak))
@@ -188,11 +188,11 @@ ping_17_long <- full_join(
   ping_17 %>% 
     pivot_longer(cols=starts_with("date"),names_to="revision",
                  names_prefix="date",values_to="date") %>%
-    select(plot,id,x,y,comments,temp,revision,date),
+    dplyr::select(plot,id,x,y,comments,temp,revision,date),
   ping_17 %>% 
     pivot_longer(cols=starts_with("stage"),names_to="revision",
                  names_prefix="stage",values_to="stage") %>%
-    select(plot,id,x,y,comments,temp,revision,stage)
+    dplyr::select(plot,id,x,y,comments,temp,revision,stage)
   ) %>%
   separate(stage,into=c("stage","graz"),sep="/") %>%
   mutate(stage=ifelse(stage=="FL50","FL",ifelse(stage=="GL","FL",stage))) 
@@ -225,11 +225,11 @@ ping_18_long <- full_join(
   ping_18 %>% 
     pivot_longer(cols=starts_with("date"),names_to="revision",
                  names_prefix="date",values_to="date") %>%
-    select(plot,id,x,y,comments,temp,revision,date),
+    dplyr::select(plot,id,x,y,comments,temp,revision,date),
   ping_18 %>% 
     pivot_longer(cols=starts_with("stage"),names_to="revision",
                  names_prefix="stage",values_to="stage") %>%
-    select(plot,id,x,y,comments,temp,revision,stage)
+    dplyr::select(plot,id,x,y,comments,temp,revision,stage)
   ) %>%
   mutate(stage=ifelse(stage=="N/A",NA,stage)) %>%
 # One record with stage=N/A --> changed to stage=NA
@@ -261,11 +261,11 @@ ping_20_long <- full_join(
   ping_20 %>% 
     pivot_longer(cols=starts_with("date"),names_to="revision",
                  names_prefix="date",values_to="date") %>%
-    select(plot,id,x,y,comments,temp,revision,date),
+    dplyr::select(plot,id,x,y,comments,temp,revision,date),
   ping_20 %>% 
     pivot_longer(cols=starts_with("stage"),names_to="revision",
                  names_prefix="stage",values_to="stage") %>%
-    select(plot,id,x,y,comments,temp,revision,stage)
+    dplyr::select(plot,id,x,y,comments,temp,revision,stage)
   ) %>%
   # Make stages similar to previous years
   mutate(stage=ifelse(stage=="F","FL",stage)) %>%
@@ -334,7 +334,7 @@ date_firstF_17  <- ping_17_long %>%
   filter(V_F=="F") %>%
   filter(date==min(date)) %>%
   mutate(date_firstF=date) %>%
-  select(id,date_firstF)
+  dplyr::select(id,date_firstF)
 
 # Calculate date when the plant was last recorded as vegetative
 # (before being recorded as flowering)
@@ -346,10 +346,10 @@ date_lastV_17  <- ping_17_long %>%
   # Remove records after first record with flowers
   filter(date==max(date)) %>%
   mutate(date_lastV=date) %>%
-  select(id,date_lastV)
+  dplyr::select(id,date_lastV)
 
 ping_17_FFD <- ping_17_long %>%
-  select(id,date,stage,V_F) %>%
+  dplyr::select(id,date,stage,V_F) %>%
   filter(!is.na(V_F)) %>%
   left_join(date_firstF_17) %>%
   filter(date<=date_firstF) %>% 
@@ -359,7 +359,7 @@ ping_17_FFD <- ping_17_long %>%
   # Remove records before last record without flowers
   pivot_wider(id_cols=id,names_from=V_F,
               values_from=c(stage,date_firstF,date_lastV)) %>%
-  select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
+  dplyr::select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
   rename(date_firstF=date_firstF_F,date_lastV=date_lastV_V) %>%
   ungroup() %>%
   arrange(id) %>%
@@ -397,7 +397,7 @@ date_firstF_18  <- ping_18_long %>%
   filter(V_F=="F") %>%
   filter(date==min(date)) %>%
   mutate(date_firstF=date) %>%
-  select(id,date_firstF)
+  dplyr::select(id,date_firstF)
 
 # Calculate date when the plant was last recorded as vegetative
 # (before being recorded as flowering)
@@ -409,10 +409,10 @@ date_lastV_18  <- ping_18_long %>%
   # Remove records after first record with flowers
   filter(date==max(date)) %>%
   mutate(date_lastV=date) %>%
-  select(id,date_lastV)
+  dplyr::select(id,date_lastV)
 
 ping_18_FFD <- ping_18_long %>%
-  select(id,date,stage,V_F) %>%
+  dplyr::select(id,date,stage,V_F) %>%
   filter(!is.na(V_F)) %>%
   left_join(date_firstF_18) %>%
   filter(date<=date_firstF) %>% 
@@ -422,7 +422,7 @@ ping_18_FFD <- ping_18_long %>%
   # Remove records before last record without flowers
   pivot_wider(id_cols=id,names_from=V_F,
               values_from=c(stage,date_firstF,date_lastV)) %>%
-  select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
+  dplyr::select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
   rename(date_firstF=date_firstF_F,date_lastV=date_lastV_V) %>%
   ungroup() %>%
   arrange(id) %>%
@@ -460,7 +460,7 @@ date_firstF_20  <- ping_20_long %>%
   filter(V_F=="F") %>%
   filter(date==min(date)) %>%
   mutate(date_firstF=date) %>%
-  select(id,date_firstF)
+  dplyr::select(id,date_firstF)
 
 # Calculate date when the plant was last recorded as vegetative
 # (before being recorded as flowering)
@@ -472,10 +472,10 @@ date_lastV_20  <- ping_20_long %>%
   # Remove records after first record with flowers
   filter(date==max(date)) %>%
   mutate(date_lastV=date) %>%
-  select(id,date_lastV)
+  dplyr::select(id,date_lastV)
 
 ping_20_FFD <- ping_20_long %>%
-  select(id,date,stage,V_F) %>%
+  dplyr::select(id,date,stage,V_F) %>%
   filter(!is.na(V_F)) %>%
   left_join(date_firstF_20) %>%
   filter(date<=date_firstF) %>% 
@@ -485,7 +485,7 @@ ping_20_FFD <- ping_20_long %>%
   # Remove records before last record without flowers
   pivot_wider(id_cols=id,names_from=V_F,
               values_from=c(stage,date_firstF,date_lastV)) %>%
-  select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
+  dplyr::select(id,stage_V,stage_F,date_firstF_F,date_lastV_V) %>%
   rename(date_firstF=date_firstF_F,date_lastV=date_lastV_V) %>%
   ungroup() %>%
   arrange(id) %>%
@@ -523,7 +523,7 @@ ping_17_peak <- ping_17_peak %>%
   mutate(plot=as.factor(Plot),id=Indv,date_peak=as.Date(Date,format="%d.%m.%y"),
          dm1=`Rosette dm1`,dm2=`Rosette dm2`,n_stems=`Nr. flowerstems`,
          max_h=`Max height`,med_h=`Median height`,comments_peak=Comments) %>%
-  select(-(Plot:Comments)) %>%
+  dplyr::select(-(Plot:Comments)) %>%
   mutate(n_stems=as.integer(ifelse(n_stems=="N/A",NA,n_stems)),
          max_h=as.numeric(ifelse(max_h=="N/A",NA,max_h)),
          med_h=as.numeric(ifelse(med_h=="N/A"|med_h=="missing",NA,med_h)))
@@ -534,7 +534,7 @@ ping_18_peak <- ping_18_peak %>%
   mutate(plot=as.factor(Plot),id=Indv,date_peak=as.Date(Date,format="%d.%m.%y"),
          dm1=`Rosette dm1`,dm2=`Rosette dm2`,n_stems=`Nr. flowerstems`,
          max_h=`Max height`,med_h=`Median height`,comments_peak=Comments) %>%
-  select(-(Plot:Comments)) %>%
+  dplyr::select(-(Plot:Comments)) %>%
   # Correct errors in max_h and med_h and make numeric vars
   mutate(max_h=str_remove(max_h,"\"")) %>%
   mutate(max_h=str_remove(max_h,"\"")) %>%
@@ -555,7 +555,7 @@ ping_20_peak <- ping_20_peak %>%
          n_seeds=`Total seeds`,comments_peak=`Comments on individual`,
          comments_seeds=`Comments on seedcounts`) %>%
   mutate(h_stem1=ifelse(h_stem1==60,6,h_stem1)) %>% # Correct wrong value
-  select(-(Plot:`Comments on seedcounts`)) %>%
+  dplyr::select(-(Plot:`Comments on seedcounts`)) %>%
   # Assign 0 seed pods to plants recorded as flowering with no info on seedpods
   mutate(n_seedpods=ifelse(F_NF=="F"&is.na(n_seedpods),0,n_seedpods)) %>%
   rowwise %>%
@@ -563,8 +563,8 @@ ping_20_peak <- ping_20_peak %>%
                                             na.rm=T))) %>%
   mutate(med_h=ifelse(is.na(h_stem1),NA,mean(c_across(h_stem1:h_stem5),
                                              na.rm=T))) %>%
-  select(-(h_stem1:h_stem5)) %>%
-  select(-F_NF)
+  dplyr::select(-(h_stem1:h_stem5)) %>%
+  dplyr::select(-F_NF)
 ```
 
 # Add info on seedpods and seeds
@@ -574,7 +574,7 @@ ping_17_seeds <- ping_17_seeds %>%
   mutate(plot=as.factor(Plot),id=`#`,n_seedpods=`Tot. sp`,
          coll_seedpods=`Coll. sp`,n_seeds=`n seeds`,
          comments_seeds=`Malin´s comments`) %>%
-  select(-(Plot:`Malin´s comments`))
+  dplyr::select(-(Plot:`Malin´s comments`))
 nrow(filter(ping_17_seeds,n_seedpods!=coll_seedpods))
 # Always collected all seedpods
 ```
@@ -583,7 +583,7 @@ nrow(filter(ping_17_seeds,n_seedpods!=coll_seedpods))
 ping_17_seedpods <- ping_17_seedpods %>%
   mutate(id=`#`,F_NF=`F/NF (Flowering/Not Flowering)`,
          n_seedpods=`Total seedpods`) %>%
-  select(-(Plot:Comments)) %>%
+  dplyr::select(-(Plot:Comments)) %>%
   # Assign 0 seed pods to plants recorded as flowering with no info on seedpods
   mutate(n_seedpods=ifelse(F_NF=="F"&is.na(n_seedpods),0,n_seedpods))
 ```
@@ -594,7 +594,7 @@ ping_18_seeds <- ping_18_seeds %>%
   mutate(plot=as.factor(Plot),id=`#`,
          n_seedpods=`Collected seedpods`, # Assuming this is true so far
          n_seeds=`Total seedcount`,comments_seeds=`Comments`) %>%
-  select(-(Plot:`Comments`)) %>%
+  dplyr::select(-(Plot:`Comments`)) %>%
   # Assign zero seeds to plants with zero seedpods
   mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds))
 ```
@@ -605,12 +605,12 @@ For 2020, info on seeds included in peak file.
 
 ```{r}
 ping_17_data <- left_join((ping_17_FFD %>% 
-                             select(id,FFD_corr)),
+                             dplyr::select(id,FFD_corr)),
                           (ping_17 %>% 
-                             select(plot,id,x,y,peak,comments,temp)))%>%
+                             dplyr::select(plot,id,x,y,peak,comments,temp)))%>%
   left_join(ping_17_peak) %>%
-  left_join(ping_17_seedpods %>% select (id,n_seedpods)) %>%
-  left_join(ping_17_seeds %>% select(plot,id,n_seeds,comments_seeds)) %>%
+  left_join(ping_17_seedpods %>% dplyr::select (id,n_seedpods)) %>%
+  left_join(ping_17_seeds %>% dplyr::select(plot,id,n_seeds,comments_seeds)) %>%
   # Assign zero seeds to plants with zero seedpods
   mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds)) %>%
   mutate(n_stems=ifelse(n_stems==21,2,n_stems)) # Fix error in n_stems
@@ -624,9 +624,9 @@ nrow(ping_17_data %>% filter(!is.na(n_seeds)))
 
 ```{r}
 ping_18_data <- left_join((ping_18_FFD %>% 
-                             select(id,FFD_corr)),
+                             dplyr::select(id,FFD_corr)),
                           (ping_18 %>% 
-                             select(plot,id,x,y,peak,comments,temp)))%>%
+                             dplyr::select(plot,id,x,y,peak,comments,temp)))%>%
   left_join(ping_18_peak) %>%
   left_join(ping_18_seeds) 
 nrow(ping_18_data)
@@ -639,19 +639,21 @@ nrow(ping_18_data %>% filter(!is.na(n_seeds)))
 
 ```{r}
 ping_20_data <- left_join((ping_20_FFD %>% 
-                             select(id,FFD_corr)),
+                             dplyr::select(id,FFD_corr)),
                           (ping_20 %>% 
-                             select(plot,id,x,y,peak,comments,start_treatment,
+                             dplyr::select(plot,id,x,y,peak,comments,start_treatment,
                                     treatment,temp)))%>%
   left_join(ping_20_peak) %>%
   # Assign zero seeds to plants with zero seedpods
-  mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds))
+  mutate(n_seeds=ifelse(n_seedpods==0,0,n_seeds)) %>%
+  mutate(treatment=as.character(treatment)) %>%
+  mutate(treatment=as.factor(ifelse(is.na(treatment),"C",treatment)))
 nrow(ping_20_data)
 # 287 ids that flowered, 
 nrow(ping_20_data %>% filter(peak==1))
 # Of which 284 with info on peak
 nrow(ping_20_data %>% filter(!is.na(n_seeds)))
-# And 135 with info on seeds
+# And 279 with info on seeds
 ```
 
 # Save clean data as .csv
