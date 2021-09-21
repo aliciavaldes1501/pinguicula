@@ -1331,15 +1331,15 @@ anova(aster3_9,aster3_mains)
 
 ## Predictions
 
-### seeds:temp_c:P:
+### seeds:temp_c:P
 
 ```{r}
 # make prediction df
 aster_predict1 <- data.frame(
   expand_grid(temp_c = seq(from = -5, to = 13, length.out = 100),
               P = as.factor(c(0,1))),
-  FFD_c = 0, # centered so mean=0
-  ros_area_c = 0, # centered so mean=0
+  FFD_c = 0, # centred so mean=0
+  ros_area_c = 0, # centred so mean=0
   #P = as.factor(0), # no pollination
   F = as.factor(0),
   seedpods_01 = 1,
@@ -1374,12 +1374,12 @@ aster_predict1.df.n_seed <- aster_predict1.df %>%
 aster_predict1.df.n_seed<-aster_predict1.df.n_seed%>%
   mutate(ymin=fit-se,ymax=fit+se)
 
-P.labs <- c("Non-pollinated","Pollinated")
+P.labs <- c("Non-supplemented","Supplemented")
 names(P.labs) <- c(0,1)
 ggplot(aster_predict1.df.n_seed)+
   geom_ribbon(aes(x=temp_c,ymin=ymin,ymax=ymax,fill=P),alpha=0.25)+
   geom_line(aes(x=temp_c,y=fit,color=P),size=1)+
-  xlab("Soil temperature (mean-centered)")+ylab("Predicted fitness")+
+  xlab("Soil temperature (mean-centred)")+ylab("Predicted fitness")+
   my_theme()+
   facet_wrap(~P,scales="free",labeller=labeller(P=P.labs))
 ggsave(filename="output/figures/seeds_temp_c_P_Aster.tiff",device="tiff",
@@ -1394,15 +1394,15 @@ aster_predict1.df.n_seed%>%
   dplyr::select(temp_c,P,fit)
 ```
 
-### seeds:temp_c:FFD_c:
+### seeds:temp_c:FFD_c
 
 ```{r}
 # make prediction df
 aster_predict2 <- data.frame(
   expand_grid(temp_c = seq(from = -5, to = 13, length.out = 100),
               FFD_c = seq(from = -29, to = 21, length.out = 100)),
-  #FFD_c = 0, # centered so mean=0
-  ros_area_c = 0, # centered so mean=0
+  #FFD_c = 0, # centred so mean=0
+  ros_area_c = 0, # centred so mean=0
   P = as.factor(0), # no pollination
   F = as.factor(0),
   seedpods_01 = 1,
@@ -1440,8 +1440,8 @@ aster_predict2.df.n_seed<-aster_predict2.df.n_seed%>%
 # Fitness in normal scale
 ggplot(aster_predict2.df.n_seed,aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
   geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
-  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
-  my_theme_legend()+labs(color="Soil temperature\n(mean-centered, ºC)")+
+  xlab("FFD (mean-centred)")+ylab("Predicted fitness")+
+  my_theme_legend()+labs(color="Soil temperature\n(mean-centred, ºC)")+
   scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
 ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_1.tiff",device="tiff",
        width=15,height=8,units="cm",dpi=300,compression="lzw")
@@ -1449,9 +1449,9 @@ ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_1.tiff",device="tiff",
 # Fitness in log10 scale
 ggplot(aster_predict2.df.n_seed,aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
   geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
-  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
+  xlab("FFD (mean-centred)")+ylab("Predicted fitness")+
   my_theme_legend()+scale_y_log10()+
-  labs(color="Soil temperature\n(mean-centered, ºC)")+
+  labs(color="Soil temperature\n(mean-centred, ºC)")+
   scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
 ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_1_log.tiff",device="tiff",
        width=15,height=8,units="cm",dpi=300,compression="lzw")
@@ -1459,8 +1459,8 @@ ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_1_log.tiff",device="tif
 # Fitness in normal scale
 ggplot(aster_predict2.df.n_seed,aes(x=temp_c,y=fit,group=as.factor(FFD_c)))+
   geom_line(aes(x=temp_c,y=fit,color=FFD_c),size=0.3)+
-  xlab("Soil temperature (mean-centered)")+ylab("Predicted fitness")+
-  my_theme_legend()+labs(color="FFD\n(mean-centered)")+
+  xlab("Soil temperature (mean-centred)")+ylab("Predicted fitness")+
+  my_theme_legend()+labs(color="FFD\n(mean-centred)")+
   scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
 ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_2.tiff",device="tiff",
        width=15,height=8,units="cm",dpi=300,compression="lzw")
@@ -1468,8 +1468,8 @@ ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_2.tiff",device="tiff",
 # Fitness in log10 scale
 ggplot(aster_predict2.df.n_seed,aes(x=temp_c,y=fit,group=as.factor(FFD_c)))+
   geom_line(aes(x=temp_c,y=fit,color=FFD_c),size=0.3)+
-  xlab("Soil temperature (mean-centered)")+ylab("Predicted fitness")+
-  my_theme_legend()+scale_y_log10()+labs(color="FFD\n(mean-centered)")+
+  xlab("Soil temperature (mean-centred)")+ylab("Predicted fitness")+
+  my_theme_legend()+scale_y_log10()+labs(color="FFD\n(mean-centred)")+
   scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
 ggsave(filename="output/figures/seeds_temp_c_FFD_c_Aster_2_log.tiff",device="tiff",
        width=15,height=8,units="cm",dpi=300,compression="lzw")
@@ -1488,9 +1488,63 @@ aster_predict2.df.n_seed%>%
 ggplot(subset(aster_predict2.df.n_seed,temp_c>3.2&temp_c<3.8),
        aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
   geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
-  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
-  my_theme_legend()+labs(color="Soil temperature\n(mean-centered, ºC)")+
+  xlab("FFD (mean-centred)")+ylab("Predicted fitness")+
+  my_theme_legend()+labs(color="Soil temperature\n(mean-centred, ºC)")+
   scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
+```
+
+### HERE: seeds:temp_c:FFD_c:P 
+
+```{r}
+# make prediction df
+aster_predict3 <- data.frame(
+  expand_grid(temp_c = seq(from = -5, to = 13, length.out = 100),
+              FFD_c = seq(from = -29, to = 21, length.out = 100),
+              P = as.factor(c(0,1))),
+  ros_area_c = 0, # centred so mean=0
+  F = as.factor(0),
+  seedpods_01 = 1,
+  n_seedpods = 1,
+  n_seeds = 0,
+  root = 1
+)
+
+# reshape data to long format
+aster_predict3_long <- reshape(as.data.frame(aster_predict3), 
+                              varying = list(vars), direction = "long", 
+                              timevar = "varb", times = as.factor(vars), 
+                              v.names = "resp")
+
+# add artifice
+aster_predict3_long$seeds <- as.integer(ifelse(
+  aster_predict3_long$varb == "n_seeds", 1, 0))
+
+aster_predict3.df <- aster_predict1_long
+
+# fixed model predictions
+aster3.p3 <- predict(aster3, newdata = aster_predict3_long,
+                    varvar = varb,idvar = id, root = root,
+                    info.tol = 1e-11, se.fit = T)
+
+aster_predict3.df$fit <- aster3.p3$fit
+aster_predict3.df$se <- aster3.p3$se.fit
+
+aster_predict3.df.n_seed <- aster_predict3.df %>%
+  filter(varb == "n_seeds")
+
+aster_predict3.df.n_seed<-aster_predict3.df.n_seed%>%
+  mutate(ymin=fit-se,ymax=fit+se)
+
+# P.labs <- c("Non-pollinated","Pollinated")
+# names(P.labs) <- c(0,1)
+# ggplot(aster_predict1.df.n_seed)+
+#   geom_ribbon(aes(x=temp_c,ymin=ymin,ymax=ymax,fill=P),alpha=0.25)+
+#   geom_line(aes(x=temp_c,y=fit,color=P),size=1)+
+#   xlab("Soil temperature (mean-centred)")+ylab("Predicted fitness")+
+#   my_theme()+
+#   facet_wrap(~P,scales="free",labeller=labeller(P=P.labs))
+# ggsave(filename="output/figures/seeds_temp_c_P_Aster.tiff",device="tiff",
+#        width=16,height=8,units="cm",dpi=300,compression="lzw")
 ```
 
 # Figures 2-3
@@ -1510,7 +1564,7 @@ fig2a<-ggplot(predict_relfitness3,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.hi
 fig2b<-ggplot(aster_predict1.df.n_seed)+
     geom_ribbon(aes(x=temp_c,ymin=ymin,ymax=ymax),alpha=0.25)+
     geom_line(aes(x=temp_c,y=fit),size=1)+
-    xlab("Soil temperature (mean-centered, ºC)")+ylab("Predicted fitness")+
+    xlab("Soil temperature (mean-centred, ºC)")+ylab("Predicted fitness")+
     my_theme()+ggtitle("B)")+
     facet_wrap(~P,scales="free",labeller=labeller(P=P.labs))
 (fig2<-plot_grid(fig2a, fig2b, ncol=1,align = "v"))
@@ -1535,7 +1589,7 @@ fig2apoints<-
         geom_line(data=subset(predict_relfitness3,group==0),
                   aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high),size=1)+
         xlab(NULL)+ylab(NULL)+
-        my_theme()+ggtitle("Non-pollinated")+
+        my_theme()+ggtitle("Non-supplemented")+
         theme(plot.title = element_text(hjust = 0.5)),
       ggplot(subset(ping_20_data,P==1),aes(x=temp,y=n_seeds_rel))+
         geom_point(size=2,alpha=0.2)+
@@ -1545,7 +1599,7 @@ fig2apoints<-
         geom_line(data=subset(predict_relfitness3,group==1),
                   aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high),size=1)+
         xlab(NULL)+ylab(NULL)+
-        my_theme()+ggtitle("Pollinated")+
+        my_theme()+ggtitle("Supplemented")+
         theme(plot.title = element_text(hjust = 0.5)),
       ncol=2),
     ggdraw()+draw_label("Soil temperature (ºC)",x = 0.5,
@@ -1566,7 +1620,7 @@ fig2bpoints<-
           geom_line(data=subset(aster_predict1.df.n_seed,P==0),
                     aes(x=temp_c,y=fit),size=1)+
           xlab(NULL)+ylab(NULL)+
-          my_theme()+ggtitle("Non-pollinated")+
+          my_theme()+ggtitle("Non-supplemented")+
           theme(plot.title = element_text(hjust = 0.5)),
         ggplot()+geom_point(data=subset(redata,varb=="n_seeds"&P==1),
                             aes(x=temp_c,y=resp),size=2,alpha=0.2)+
@@ -1575,10 +1629,10 @@ fig2bpoints<-
           geom_line(data=subset(aster_predict1.df.n_seed,P==1),
                     aes(x=temp_c,y=fit),size=1)+
           xlab(NULL)+ylab(NULL)+
-          my_theme()+ggtitle("Pollinated")+
+          my_theme()+ggtitle("Supplemented")+
           theme(plot.title = element_text(hjust = 0.5)),
         ncol=2),
-    ggdraw()+draw_label("Soil temperature (mean-centered, ºC)",x = 0.5,
+    ggdraw()+draw_label("Soil temperature (mean-centred, ºC)",x = 0.5,
                         fontfamily="serif",size=18),
     ncol=1,rel_heights=c(1.5, 0.1)),
   ncol=2,rel_widths=c(0.1,1.5)
@@ -1602,9 +1656,9 @@ fig3a<-ggplot(predict_relfitness1,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.hi
   theme(legend.position="top")+ggtitle("A)")
 fig3b<-ggplot(aster_predict2.df.n_seed,aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
   geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
-  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
+  xlab("FFD (mean-centred)")+ylab("Predicted fitness")+
   my_theme_legend()+scale_y_log10()+
-  labs(color="Soil temperature\n(mean-centered, ºC)")+
+  labs(color="Soil temperature\n(mean-centred, ºC)")+
   scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))+
   theme(legend.position="top")+ggtitle("B)")
 (fig3<-plot_grid(fig3a, fig3b,align="h",rel_widths=c(1, 1.08)))
