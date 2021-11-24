@@ -1,0 +1,884 @@
+---
+title: "Response of Pinguicula vulgaris to geothermal heating"
+subtitle: "Analyses"
+author : "Alicia Valdés"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: 4
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(tibble.width = Inf)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE) 
+options("jtools-digits" = 3)
+options(pillar.sigfigs=6)
+```
+
+```{r load packages, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(jtools)
+library(RColorBrewer)
+library(gridExtra)
+library(ggeffects)
+library(ggthemes)
+library(aster)
+library(knitr)
+library(viridis)
+library(cowplot)
+```
+
+```{r Define ggplot themes and palettes, include=FALSE}
+my_theme <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(legend.position="none")+theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+my_theme_legend <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+myPalette <- colorRampPalette(brewer.pal(11, "YlOrRd"))
+```
+
+```{r include=FALSE}
+ping_20_data <- read_csv("data/clean/ping_20_data.csv")
+```
+
+```{r include=FALSE}
+ping_20_data$ros_area <- with(ping_20_data,pi*dm1*dm2)
+```
+
+Define two variables: P (1 if pollinated, 0 if not) and F (1 if fed, 0 if not).
+
+```{r}
+ping_20_data <- ping_20_data %>%
+  mutate(P=as.factor(ifelse(treatment=="P"|treatment=="PF",1,0)),
+         F=as.factor(ifelse(treatment=="F"|treatment=="PF",1,0)))
+```
+
+```{r}
+nrow(subset(ping_20_data,P==0))/nrow(ping_20_data)
+nrow(subset(ping_20_data,F==0))/nrow(ping_20_data)
+```
+
+Approximately half of the plants are pollinated and half are fed.
+
+Proportion of plants that produced 0 seeds:
+
+```{r}
+nrow(subset(ping_20_data,n_seeds==0))/nrow(ping_20_data)
+```
+
+Around half of the plants produced no seeds.
+
+Create 0/1 variable for fitness:
+
+```{r}
+ping_20_data$fitness_01<-with(ping_20_data,ifelse(n_seeds==0,0,
+                                                  ifelse(n_seeds>0,1,NA)))
+```
+
+One case when n_seedpods>0 and n_seeds=0: convert to NA:
+
+```{r}
+subset(ping_20_data,n_seedpods>0&n_seeds==0)
+```
+
+```{r}
+ping_20_data$n_seeds<-with(ping_20_data,ifelse(id=="P-450",NA,n_seeds))
+```
+
+# 1. Models for FFD 
+
+Effect of temperature on FFD
+
+Using linear models, including quadratic effects of temp.
+
+```{r echo=TRUE}
+FFD_2020_1<-lm(FFD_corr~temp+I(temp^2),ping_20_data)
+summary(FFD_2020_1)
+```
+
+Model diagnostics (not shown) indicated that linear models are OK.
+
+## Figure 1: Model prediction
+
+```{r, fig.height=3, fig.width=4}
+predict_FFD<-ggpredict(FFD_2020_1,terms="temp")
+(fig1<-ggplot(ping_20_data,aes(x=temp,y=FFD_corr))+
+  geom_ribbon(data=predict_FFD,
+              aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high),
+              fill="grey",alpha=0.7)+
+  geom_line(data=predict_FFD,aes(x=x,y=predicted),size=1,color="black")+
+  geom_point(size=2,alpha=0.2)+
+  xlab("Soil temperature (ºC)")+ylab("FFD")+
+  my_theme())
+ggsave(filename="output/figures/fig1.tiff",device="tiff",
+       width=9,height=8,units="cm",dpi=300,compression="lzw")
+```
+
+The effect looks almost linear.
+
+Predictions of FFD\_corr for minimum and maximum temperatures:
+
+```{r}
+ggpredict(FFD_2020_1,terms="temp[minmax]") 
+# 190.85-155.16=35.69 days earlier on warmer soils
+```
+
+# 2. Aster models
+
+## Transform data
+
+```{r}
+ping_20_data$ros_area_log<-log(ping_20_data$ros_area)
+```
+
+Any Fruits (seedpods_01) --> Fruits (n_seedpods) --> Seeds (n_seeds)
+
+Any fruits (did the plant produce fruits) is Bernoulli
+Number of Fruits is zero-truncated negative binomial
+Number of seeds is Poisson 
+
+Reshape data:
+
+```{r}
+ping_20_data$n_seedpods<-as.integer(ping_20_data$n_seedpods)
+ping_20_data$n_seeds<-as.integer(ping_20_data$n_seeds)
+ping_20_data$seedpods_01<-with(ping_20_data,ifelse(n_seedpods>0,1,0))
+vars <- c("seedpods_01", "n_seedpods","n_seeds") # Our fitness variables
+redata <- reshape(data.frame(subset(ping_20_data,
+                                    !is.na(n_seeds)&!is.na(ros_area_log))
+                             [c(1:2,10,15:16,22:26)]), 
+                  varying = list(vars),
+                  direction = "long", 
+                  timevar = "varb", # reshape to long format
+                  times = as.factor(vars), v.names = "resp")
+redata <- data.frame(redata, root = 1) # This adds a variable root to the df
+# and makes all its values one (including for non-root nodes, but those values
+# are ignored by all aster package functions).
+
+# resp contains all of the data in the variables indicated by the string
+# vars packed into a single vector
+# varb indicates which original variable the corresponding element of
+# resp came from
+```
+
+```{r}
+names(data.frame(subset(ping_20_data,
+                                    !is.na(n_seeds)&!is.na(ros_area_log))
+                             [c(1:2,10,15:16,22:26)]))
+names(redata)
+nrow(data.frame(subset(ping_20_data,
+                                    !is.na(n_seeds)&!is.na(ros_area_log))
+                             [c(1:2,10,15:16,22:26)]))
+nrow(redata)
+nrow(data.frame(subset(ping_20_data,
+                                    !is.na(n_seeds)&!is.na(ros_area_log))
+                             [c(1:2,10,15:16,22:26)])) * length(vars)
+sapply(redata, class)
+levels(redata$varb)
+length(unique(redata$id))
+```
+
+Show the graphical model:
+
+```{r}
+pred <- c(0,1,2) # specifies the predecessor structure of the graph
+
+foo <- c("root", vars)
+pvars <- foo[pred + 1]
+bar <- cbind(pvars, vars)
+colnames(bar) <- c("pred", "succ")
+bar
+```
+Look at Poisson distributions for seedpods and seeds:
+
+```{r}
+#For n_seedpods
+n_seedpods.dist <- subset(ping_20_data,
+                     !is.na(n_seeds)&
+                       !is.na(ros_area_log))$n_seedpods[subset(ping_20_data,
+        !is.na(n_seeds)&!is.na(ros_area_log))$seedpods_01 == 1]
+hist(n_seedpods.dist)
+length(n_seedpods.dist) #130
+sum(n_seedpods.dist == 0) #0
+n_seedpods.parms <- fitdistr(n_seedpods.dist, "poisson")
+n_seedpods.parms #lambda = 1.14615385
+
+#For n_seeds
+n_seeds.dist <- subset(ping_20_data,
+                     !is.na(n_seeds)&
+                       !is.na(ros_area_log))$n_seeds[subset(ping_20_data,
+                     !is.na(n_seeds)&
+                       !is.na(ros_area_log))$n_seedpods > 0]
+hist(n_seeds.dist) 
+length(n_seeds.dist) #130
+sum(n_seeds.dist == 0) #0
+n_seeds.parms <-fitdistr(n_seeds.dist, "poisson")
+n_seeds.parms # lambda = 234.069231
+```
+
+Look at negative binomial distributions for seedpods and seeds:
+
+```{r}
+#For n_seedpods
+n_seedpods.parms2 <- fitdistr(n_seedpods.dist, "negative binomial")
+n_seedpods.parms2 #size = 4.876975e+02
+
+#For n_seeds
+n_seeds.parms2 <-fitdistr(n_seeds.dist, "negative binomial")
+n_seeds.parms2 # size = 5.8823340
+```
+
+Specifying families:
+
+```{r}
+fam <- c(1,2,3) # specifies the one-parameter exponential families for the nodes
+famlist <- list(fam.bernoulli(), 
+                fam.truncated.negative.binomial(size=4.876975e+02,
+                                                 truncation = 0),
+                fam.poisson())
+# Here: Bernouilli, truncated.negative.binomial, poisson
+
+vars[fam == 1]
+vars[fam == 2]
+vars[fam == 3]
+```
+
+```{r}
+# creating the fitness variable of interest
+seeds <- grep("n_seeds", as.character(redata$varb))
+seeds <- is.element(seq(along = redata$varb), seeds)
+redata <- data.frame(redata, seeds = as.integer(seeds))
+names(redata)
+```
+
+Center the predictors (I think we do not need to use standardized predictors in Aster models, but centering the predictors helps the model to converge):
+
+```{r}
+redata$temp_c<-redata$temp-mean(redata$temp)
+redata$FFD_c<-redata$FFD_corr-mean(redata$FFD_corr)
+redata$ros_area_c<-redata$ros_area_log-mean(redata$ros_area_log)
+```
+
+
+## Fit model
+
+Fitting the full Aster model:
+
+```{r}
+# Full Aster model with seeds as the interaction for all fixed variables
+aster1 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+# Include varb in the formula to get a different “intercept” 
+# for each node in the graph (i.e. one for fitness_01 and one for n_seeds)
+# The categorical variable varb gets turned into as many dummy
+# variables as there are nodes in the graph, one is dropped, and the
+# “intercept” dummy variable (all components = 1) is added; the
+# effect is to provide a different intercept for each node.
+# Include interaction seeds: with all other variables
+# Seehttps://groups.google.com/g/aster-analysis-user-group/c/xwanCX8VOWQ/m/AcTnF3E3BAAJ 
+# and code there.
+# According to https://www.stat.umn.edu/geyer/8931aster/slides/s1.pdf#page=55 
+# (slides 55-71), we do this to have separate coefficients for the “layer” 
+# of the graph consisting of terminal nodes (as in aster models, regression
+# coefficients “for” a node of the graph also influence all “earlier” nodes
+# To estimate the effects of each predictor on lifetime fitness, each predictor
+# was fit at the level of total seed set in the model (Shaw et al. 2008)
+```
+
+```{r}
+summary(aster1, 
+        show.graph = TRUE, # Table about the graph structure in the printout
+        info.tol = 1e-11) # To help the model to converge
+# (see https://groups.google.com/g/aster-analysis-user-group/c/xXXROez8aAA/m/BrNE6whiIEQJ)
+```
+
+## Test interactions
+
+The Aster manual advises to not look at significances in the summary, but instead compare models with a likelihood ratio test to evaluate significance of each term. The comparison between two or more models . . . will only be valid if they are (1) fitted to the same dataset, (2) models are nested, (3) models are of the same type (all conditional or all unconditional), (4) have the same dependence graph and exponential families. None of this is currently checked.
+
+Determine the significance of fixed effects and interactions by comparing submodels without the term of interest to the full model using LRTs.
+
+Use LRTs comparing submodels to fuller models to test each predictor of interest.
+
+Full model with different syntax, making it easier to remove terms:
+
+```{r}
+aster1 <- aster(resp ~ varb+seeds:temp_c+seeds:FFD_c+seeds:P+seeds:F+
+                      seeds:ros_area_c+seeds:temp_c:FFD_c+seeds:temp_c:P+
+                      seeds:FFD_c:P+seeds:temp_c:F+seeds:FFD_c:F+seeds:P:F+
+                      seeds:temp_c:FFD_c:P+seeds:temp_c:FFD_c:F+
+                      seeds:temp_c:P:F+seeds:FFD_c:P:F+seeds:temp_c:FFD_c:P:F,
+                pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+Submodels:
+
+Testing the significance of seeds:temp_c:FFD_c:P:F
+
+```{r}
+aster1_1 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                        seeds:temp_c:FFD_c:P:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_1,aster1)
+```
+
+Testing the significance of seeds:FFD_c:P:F
+
+```{r}
+aster1_2 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_2,aster1_1)
+```
+
+Testing the significance of seeds:temp_c:P:F
+
+```{r}
+aster1_3 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_3,aster1_2)
+```
+
+Testing the significance of seeds:temp_c:FFD_c:F
+
+```{r}
+aster1_4 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_4,aster1_3)
+```
+
+Testing the significance of seeds:temp_c:FFD_c:P
+
+```{r}
+aster1_5 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_5,aster1_4)
+```
+
+Testing the significance of seeds:P:F
+
+```{r}
+aster1_6 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P-
+                    seeds:P:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_6,aster1_5)
+```
+
+Testing the significance of seeds:FFD_c:F
+
+```{r}
+aster1_7 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P-
+                    seeds:P:F-
+                    seeds:FFD_c:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_7,aster1_6)
+```
+
+Testing the significance of seeds:temp_c:F
+
+```{r}
+aster1_8 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P-
+                    seeds:P:F-
+                    seeds:FFD_c:F-
+                    seeds:temp_c:F,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_8,aster1_7)
+```
+
+Testing the significance of seeds:FFD_c:P
+
+```{r}
+aster1_9 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P-
+                    seeds:P:F-
+                    seeds:FFD_c:F-
+                    seeds:temp_c:F-
+                    seeds:FFD_c:P,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_9,aster1_8)
+```
+
+Testing the significance of seeds:temp_c:P
+
+```{r}
+aster1_10 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P-
+                    seeds:P:F-
+                    seeds:FFD_c:F-
+                    seeds:temp_c:F-
+                    seeds:FFD_c:P-
+                    seeds:temp_c:P,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_10,aster1_9)
+```
+
+Testing the significance of seeds:temp_c:FFD_c
+
+```{r}
+aster1_11 <- aster(resp ~ varb+seeds:(temp_c*FFD_c*P*F+ros_area_c)-
+                    seeds:temp_c:FFD_c:P:F-
+                    seeds:FFD_c:P:F-
+                    seeds:temp_c:P:F-
+                    seeds:temp_c:FFD_c:F-
+                    seeds:temp_c:FFD_c:P-
+                    seeds:P:F-
+                    seeds:FFD_c:F-
+                    seeds:temp_c:F-
+                    seeds:FFD_c:P-
+                    seeds:temp_c:P-
+                    seeds:temp_c:FFD_c,
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_11,aster1_10)
+```
+
+## Test main effects without interactions
+
+```{r}
+aster1_mains <- aster(resp ~ varb+seeds:(temp_c+FFD_c+P+F+ros_area_c),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+summary(aster1_mains, 
+        show.graph = TRUE, # Table about the graph structure in the printout
+        info.tol = 1e-11) # To help the model to converge
+```
+
+Submodels:
+
+Testing the significance of seeds:ros_area_c
+
+```{r}
+aster1_12 <- aster(resp ~ varb+seeds:(temp_c+FFD_c+P+F),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_12,aster1_mains)
+```
+
+Testing the significance of seeds:F
+
+```{r}
+aster1_13 <- aster(resp ~ varb+seeds:(temp_c+FFD_c+P+ros_area_c),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_13,aster1_mains)
+```
+
+Testing the significance of seeds:P
+
+```{r}
+aster1_14 <- aster(resp ~ varb+seeds:(temp_c+FFD_c+F+ros_area_c),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_14,aster1_mains)
+```
+
+Testing the significance of seeds:FFD_c
+
+```{r}
+aster1_15 <- aster(resp ~ varb+seeds:(temp_c+P+F+ros_area_c),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_15,aster1_mains)
+```
+
+Testing the significance of seeds:temp_c
+
+```{r}
+aster1_16 <- aster(resp ~ varb+seeds:(FFD_c+P+F+ros_area_c),
+                    pred, fam, famlist=famlist, varb, id, root, data = redata)
+```
+
+```{r}
+anova(aster1_16,aster1_mains)
+```
+
+## Table LRTs
+
+```{r message=FALSE, warning=FALSE}
+table_LRTs<-bind_rows(
+  tidy(anova(aster1_16,aster1_mains))%>%mutate(term="seeds:temp_c"),
+  tidy(anova(aster1_15,aster1_mains))%>% mutate(term="seeds:FFD_c"),
+  tidy(anova(aster1_14,aster1_mains))%>%mutate(term="seeds:P"),
+  tidy(anova(aster1_13,aster1_mains))%>%mutate(term="seeds:F"),
+  tidy(anova(aster1_12,aster1_mains))%>%mutate(term="seeds:ros_area_c"),
+  tidy(anova(aster1_11,aster1_10))%>%mutate(term="seeds:temp_c:FFD_c"),
+  tidy(anova(aster1_10,aster1_9))%>% mutate(term="seeds:temp_c:P"),
+  tidy(anova(aster1_9,aster1_8))%>%mutate(term="seeds:FFD_c:P"),
+  tidy(anova(aster1_8,aster1_7))%>%mutate(term="seeds:temp_c:F"),
+  tidy(anova(aster1_7,aster1_6))%>%mutate(term="seeds:FFD_c:F"),
+  tidy(anova(aster1_6,aster1_5))%>%mutate(term="seeds:P:F"),
+  tidy(anova(aster1_5,aster1_4))%>%mutate(term="seeds:temp_c:FFD_c:P"),
+  tidy(anova(aster1_4,aster1_3))%>%mutate(term="seeds:temp_c:FFD_c:F"),
+  tidy(anova(aster1_3,aster1_2))%>%mutate(term="seeds:temp_c:P:F"),
+  tidy(anova(aster1_2,aster1_1))%>%mutate(term="seeds:FFD_c:P:F"),
+  tidy(anova(aster1_1,aster1))%>%mutate(term="seeds:temp_c:FFD_c:P:F")
+)
+kable(table_LRTs)
+```
+
+Significant effects are seeds:temp_c:FFD_c and seeds:temp_c:P.
+
+## Predictions
+
+### seeds:temp_c:P
+
+```{r}
+quantile(redata$temp_c,probs = c(0.05,0.95))
+# Prediction for the range of temperatures 
+# with the highest 5% removed
+
+# make prediction df
+aster_predict1 <- data.frame(
+  expand_grid(temp_c = seq(from = -3.658608, to = 5.941392, length.out = 100),
+              P = as.factor(c(0,1))),
+  FFD_c = 0, # centered so mean=0
+  ros_area_c = 0, # centered so mean=0
+  #P = as.factor(0), # no pollination
+  F = as.factor(0),
+  seedpods_01 = 1,
+  n_seedpods = 1,
+  n_seeds = 0,
+  root = 1
+)
+
+# reshape data to long format
+aster_predict1_long <- reshape(as.data.frame(aster_predict1), 
+                              varying = list(vars), direction = "long", 
+                              timevar = "varb", times = as.factor(vars), 
+                              v.names = "resp")
+
+# add artifice
+aster_predict1_long$seeds <- as.integer(ifelse(
+  aster_predict1_long$varb == "n_seeds", 1, 0))
+
+aster_predict1.df <- aster_predict1_long
+
+# fixed model predictions
+aster1.p1 <- predict(aster1, newdata = aster_predict1_long,
+                    varvar = varb,idvar = id, root = root,
+                    info.tol = 1e-11, se.fit = T)
+
+aster_predict1.df$fit <- aster1.p1$fit
+aster_predict1.df$se <- aster1.p1$se.fit
+
+aster_predict1.df.n_seed <- aster_predict1.df %>%
+  filter(varb == "n_seeds")
+
+aster_predict1.df.n_seed<-aster_predict1.df.n_seed%>%
+  mutate(ymin=fit-se,ymax=fit+se)
+
+P.labs <- c("Non-supplemented","Supplemented")
+names(P.labs) <- c(0,1)
+ggplot(aster_predict1.df.n_seed)+
+  geom_ribbon(aes(x=temp_c,ymin=ymin,ymax=ymax,fill=P),alpha=0.25)+
+  geom_line(aes(x=temp_c,y=fit,color=P),size=1)+
+  xlab("Soil temperature (mean-centered)")+ylab("Predicted fitness")+
+  my_theme()+
+  facet_wrap(~P,scales="free",labeller=labeller(P=P.labs))
+```
+
+For non-pollinated plants, fitness is higher at cold soil temperatures, but for pollinated plants, fitness is higher at warm soil temperatures.
+
+```{r}
+aster_predict1.df.n_seed%>%
+  filter(temp_c==min(temp_c)|temp_c==max(temp_c))%>%
+  dplyr::select(temp_c,P,fit)
+```
+
+### seeds:temp_c:FFD_c
+
+```{r}
+quantile(redata$temp_c,probs = c(0.05,0.95))
+# Prediction for the range of temperatures 
+# with the highest 5% removed
+quantile(redata$FFD_c,probs = c(0.05,0.95))
+# And for the range of FFD
+# with the lowest 4% removed
+
+# make prediction df
+aster_predict2 <- data.frame(
+  expand_grid(temp_c = seq(from = -3.658608, to = 5.941392, length.out = 50),
+              FFD_c = seq(from = -13.93271, to = 13.56729, length.out = 50)),
+  #FFD_c = 0, # centered so mean=0
+  ros_area_c = 0, # centered so mean=0
+  P = as.factor(0), # no pollination
+  F = as.factor(0),
+  seedpods_01 = 1,
+  n_seedpods = 1,
+  n_seeds = 0,
+  root = 1
+)
+
+# reshape data to long format
+aster_predict2_long <- reshape(as.data.frame(aster_predict2), 
+                              varying = list(vars), direction = "long", 
+                              timevar = "varb", times = as.factor(vars), 
+                              v.names = "resp")
+
+# add artifice
+aster_predict2_long$seeds <- as.integer(ifelse(
+  aster_predict2_long$varb == "n_seeds", 1, 0))
+
+aster_predict2.df <- aster_predict2_long
+
+# fixed model predictions
+aster1.p2 <- predict(aster1, newdata = aster_predict2_long,
+                    varvar = varb,idvar = id, root = root,
+                    info.tol = 1e-11, se.fit = T)
+
+aster_predict2.df$fit <- aster1.p2$fit
+aster_predict2.df$se <- aster1.p2$se.fit
+
+aster_predict2.df.n_seed <- aster_predict2.df %>%
+  filter(varb == "n_seeds")
+
+aster_predict2.df.n_seed<-aster_predict2.df.n_seed%>%
+  mutate(ymin=fit-se,ymax=fit+se)
+
+ggplot(aster_predict2.df.n_seed,aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
+  geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
+  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
+  my_theme_legend()+labs(color="Soil temperature\n(mean-centered, ºC)")+
+  scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
+
+ggplot(aster_predict2.df.n_seed,aes(x=temp_c,y=fit,group=as.factor(FFD_c)))+
+  geom_line(aes(x=temp_c,y=fit,color=FFD_c),size=0.3)+
+  xlab("Soil temperature (mean-centered)")+ylab("Predicted fitness")+
+  my_theme_legend()+labs(color="FFD\n(mean-centered)")+
+  scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
+```
+
+It is much better to flower early at cold soil temperatures, but not at warm soil temperatures, where it is slightly better to flower late. 
+
+```{r}
+aster_predict2.df.n_seed%>%
+  dplyr::select(temp_c,FFD_c,fit)%>%
+  filter(temp_c>3.2&temp_c<3.8)
+# selection favours earlier flowering at temp_c up to 3.4, 
+# and later flowering at higher temp_c
+3.4+mean(redata$temp)
+# temp_c=3.4 corresponds to temp=16.9
+ggplot(subset(aster_predict2.df.n_seed,temp_c>3.2&temp_c<3.8),
+       aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
+  geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
+  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
+  my_theme_legend()+labs(color="Soil temperature\n(mean-centered, ºC)")+
+  scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
+```
+
+### seeds:temp_c:FFD_c:P1 (not used - NS)
+
+```{r}
+quantile(redata$temp_c,probs = c(0.05,0.95))
+# Prediction for the range of temperatures 
+# with the highest 5% removed
+quantile(redata$FFD_c,probs = c(0.05,0.95))
+# And for the range of FFD
+# with the lowest 4% removed
+
+# make prediction df
+aster_predict3 <- data.frame(
+  expand_grid(temp_c = seq(from = -3.658608, to = 5.941392, length.out = 50),
+              FFD_c = seq(from = -13.93271, to = 13.56729, length.out = 50)),
+  #FFD_c = 0, # centered so mean=0
+  ros_area_c = 0, # centered so mean=0
+  P = as.factor(1), # pollination
+  F = as.factor(0),
+  seedpods_01 = 1,
+  n_seedpods = 1,
+  n_seeds = 0,
+  root = 1
+)
+
+# reshape data to long format
+aster_predict3_long <- reshape(as.data.frame(aster_predict3), 
+                              varying = list(vars), direction = "long", 
+                              timevar = "varb", times = as.factor(vars), 
+                              v.names = "resp")
+
+# add artifice
+aster_predict3_long$seeds <- as.integer(ifelse(
+  aster_predict3_long$varb == "n_seeds", 1, 0))
+
+aster_predict3.df <- aster_predict3_long
+
+# fixed model predictions
+aster1.p3 <- predict(aster1, newdata = aster_predict3_long,
+                    varvar = varb,idvar = id, root = root,
+                    info.tol = 1e-11, se.fit = T)
+
+aster_predict3.df$fit <- aster1.p3$fit
+aster_predict3.df$se <- aster1.p3$se.fit
+
+aster_predict3.df.n_seed <- aster_predict3.df %>%
+  filter(varb == "n_seeds")
+
+aster_predict3.df.n_seed<-aster_predict3.df.n_seed%>%
+  mutate(ymin=fit-se,ymax=fit+se)
+
+# P.labs <- c("Non-pollinated","Pollinated")
+# names(P.labs) <- c(0,1)
+# ggplot(aster_predict1.df.n_seed)+
+#   geom_ribbon(aes(x=temp_c,ymin=ymin,ymax=ymax,fill=P),alpha=0.25)+
+#   geom_line(aes(x=temp_c,y=fit,color=P),size=1)+
+#   xlab("Soil temperature (mean-centered)")+ylab("Predicted fitness")+
+#   my_theme()+
+#   facet_wrap(~P,scales="free",labeller=labeller(P=P.labs))
+# ggsave(filename="output/figures/seeds_temp_c_P_Aster.tiff",device="tiff",
+#        width=16,height=8,units="cm",dpi=300,compression="lzw")
+
+ggplot(aster_predict3.df.n_seed,aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
+  geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
+  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
+  my_theme_legend()+scale_y_log10()+
+  labs(color="Soil temperature\n(mean-centered, ºC)")+
+  scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))
+```
+
+## Figure 2
+
+```{r}
+(fig2<-
+  plot_grid(
+  ggdraw()+draw_label("Predicted fitness",y = 0.5,angle=90,
+                      fontfamily="serif",size=18),
+  plot_grid(
+    plot_grid(
+        ggplot()+geom_point(data=subset(redata,varb=="n_seeds"&P==0&
+                                          temp_c>-3.658608&
+                                          temp_c<=5.941392),
+                            aes(x=temp_c,y=resp),size=2,alpha=0.2)+
+          geom_ribbon(data=subset(aster_predict1.df.n_seed,P==0),
+                      aes(x=temp_c,ymin=ymin,ymax=ymax),alpha=0.25)+
+          geom_line(data=subset(aster_predict1.df.n_seed,P==0),
+                    aes(x=temp_c,y=fit),size=1)+
+          xlab(NULL)+ylab(NULL)+
+          my_theme()+ggtitle("Non-supplemented")+
+          theme(plot.title = element_text(hjust = 0.5)),
+        ggplot()+geom_point(data=subset(redata,varb=="n_seeds"&P==1&
+                                          temp_c>-3.658608&
+                                          temp_c<=5.941392),
+                            aes(x=temp_c,y=resp),size=2,alpha=0.2)+
+          geom_ribbon(data=subset(aster_predict1.df.n_seed,P==1),
+                      aes(x=temp_c,ymin=ymin,ymax=ymax),alpha=0.25)+
+          geom_line(data=subset(aster_predict1.df.n_seed,P==1),
+                    aes(x=temp_c,y=fit),size=1)+
+          xlab(NULL)+ylab(NULL)+
+          my_theme()+ggtitle("Supplemented")+
+          theme(plot.title = element_text(hjust = 0.5)),
+        ncol=2),
+    ggdraw()+draw_label("Soil temperature (mean-centered, ºC)",x = 0.5,
+                        fontfamily="serif",size=18),
+    ncol=1,rel_heights=c(1.5, 0.15)),
+  ncol=2,rel_widths=c(0.15,1.5)
+))
+ggsave(fig2,filename="output/figures/fig2.tiff",device="tiff",
+       width=16,height=8,units="cm",dpi=300,compression="lzw")
+```
+
+## Figure 3
+
+```{r}
+ggplot(aster_predict2.df.n_seed,aes(x=FFD_c,y=fit,group=as.factor(temp_c)))+
+  geom_line(aes(x=FFD_c,y=fit,color=temp_c),size=0.3)+
+  xlab("FFD (mean-centered)")+ylab("Predicted fitness")+
+  my_theme_legend()+
+  labs(color="Soil temperature\n(mean-centered, ºC)")+
+  scale_colour_gradientn(colours = plasma(n=100,begin=0.4,end=0.9,direction=-1))+
+  theme(legend.position="right")
+ggsave(filename="output/figures/fig3.tiff",device="tiff",
+       width=15,height=8,units="cm",dpi=300,compression="lzw")
+```
+
+# Session info
+
+```{r eval=FALSE, include=FALSE}
+sessionInfo()
+```
